@@ -5,6 +5,7 @@
   "type": "module",
   "description": "LJB plugin manifest types and validation",
   "exports": {
-    ".": "./index.mjs"
+    ".": "./index.mjs",
+    "./register-context": "./register-context.mjs"
   }
 }

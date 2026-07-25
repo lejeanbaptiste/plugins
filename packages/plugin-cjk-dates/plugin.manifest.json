@@ -70,6 +70,10 @@
   },
   "bundled": [
     "dist/register.mjs",
+    "src/register.ts",
+    "scripts/download-python-runtime.mjs",
+    "scripts/retryable-fetch.mjs",
+    "scripts/smoke-test.mjs",
     "python"
   ]
 }

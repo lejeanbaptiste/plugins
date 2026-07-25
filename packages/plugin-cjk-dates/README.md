@@ -2,18 +2,45 @@
 
 Premodern date tagging and disambiguation for China, Japan, and Korea using [Sanmiao](https://pypi.org/project/sanmiao/).
 
-## Status
+## Build
 
-**Phase 1 (current):** LJB gates calendar tools, East Asian date fields, and schema merge on this plugin being enabled. The bundled Python runtime is symlinked/copied into `{userData}/plugins/cjk-dates/python/` when the plugin is installed or enabled.
+```bash
+cd plugins
+npm install
+npm run build:cjk-dates
+npm run smoke:cjk-dates
+```
 
-**Later phases:** Move sanmiao TypeScript UI, IPC bridge, and bundled Python out of core LJB into this package.
-
-## Development
-
-When you run the desktop app from source with an empty plugin folder, LJB seeds this package from `plugins/packages/` and auto-enables it so existing date workflows keep working.
-
-To install manually: **Tools → Plugins… → Install from folder** and select this directory.
+`dist/register.mjs` is a thin entry (~400 bytes) that loads UI from the LJB host via `loadHostModule('cjk-dates-ui')`.
 
 ## Python runtime
 
-The plugin manifest declares a bundled CPython tree under `python/`. In dev, the desktop app links that from `lejeanbaptiste/apps/desktop/resources/python` (populated by `npm run python:download` in `apps/desktop`).
+```bash
+npm run python:download -w @ljb/plugin-cjk-dates
+```
+
+## Development with LJB desktop
+
+1. Build the plugin (`npm run build:cjk-dates`)
+2. Start LJB: `npm run dev:desktop` from `lejeanbaptiste`
+3. Enable **East Asian dates** in Tools → Plugins
+
+On first dev launch with no plugins installed, LJB seeds this package from `plugins/packages/` and auto-enables it.
+
+## Smoke test
+
+```bash
+npm run smoke:cjk-dates
+```
+
+Checks manifest validation, `register()` wiring, host UI module, python script presence, and bundle size — no Electron required.
+
+## Architecture
+
+| Layer | Location |
+|-------|----------|
+| Plugin manifest + Python runtime | This package |
+| Thin `dist/register.mjs` | This package (esbuild) |
+| Calendar UI + curator panels | LJB host module `plugins/hostModules/cjkDatesUi.ts` |
+| Generic plugin host | `lejeanbaptiste` — `plugins:invokePython`, extension registry |
+| TEI schema merge | Desktop main process (gated on plugin enable) |

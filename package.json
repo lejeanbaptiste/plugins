@@ -9,6 +9,8 @@
   ],
   "scripts": {
     "validate": "node packages/plugin-sdk/validate-all.mjs",
+    "build:cjk-dates": "npm run build -w @ljb/plugin-cjk-dates",
+    "smoke:cjk-dates": "npm run smoke -w @ljb/plugin-cjk-dates",
     "test": "node --test 'packages/**/*.test.mjs'"
   },
   "license": "GPL-2.0"
