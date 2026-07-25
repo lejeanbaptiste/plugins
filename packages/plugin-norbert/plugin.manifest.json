@@ -70,6 +70,16 @@
           "releaseId": "authority-packs-chinese",
           "manifestPath": "norbert/manifest.json"
         }
+      },
+      {
+        "id": "norbert-offices",
+        "label": "Norbert offices (官名)",
+        "defaultTag": "roleName",
+        "install": {
+          "source": "authoritypacks-release",
+          "releaseId": "authority-packs-chinese",
+          "manifestPath": "norbert/manifest.json"
+        }
       }
     ],
     "settingsSections": [
@@ -101,6 +111,9 @@
   },
   "bundled": [
     "dist/register.mjs",
+    "data/surnames.json",
+    "data/geo-admin-suffixes.json",
+    "data/wiki-nt-links.json",
     "python"
   ]
 }

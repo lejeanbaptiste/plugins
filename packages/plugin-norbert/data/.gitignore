@@ -1,0 +1,11 @@
+# Raw / intermediate wiki crawl outputs (regenerate locally)
+wiki-noble-titles.ndjson
+wiki-noble-titles.csv
+.wiki-noble-titles.checkpoint.json
+wiki-norbert-review.ndjson
+wiki-apply.sql
+wiki-apply-summary.txt
+
+# Shippable curated asset (commit this):
+!wiki-nt-links.json
+!wiki-nt-links.ndjson

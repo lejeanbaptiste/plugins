@@ -3,5 +3,25 @@
   "version": "0.1.0",
   "private": true,
   "description": "Norbert Chinese prosopography plugin for LJB",
-  "ljbPlugin": true
+  "ljbPlugin": true,
+  "type": "module",
+  "dependencies": {
+    "opencc-js": "^1.0.5",
+    "socks-proxy-agent": "^8.0.5",
+    "undici": "^7.16.0"
+  },
+  "scripts": {
+    "sync:data": "node scripts/sync-norbert-data.mjs",
+    "sync:surnames": "node scripts/sync-surnames.mjs",
+    "fetch:wiki-noble-titles": "node scripts/fetch-wiki-noble-titles.mjs",
+    "enrich:wiki-links": "node scripts/enrich-wiki-links.mjs",
+    "prepare:wiki-review": "node scripts/prepare-wiki-review.mjs",
+    "compile:wiki-nt-asset": "node scripts/compile-wiki-nt-asset.mjs",
+    "apply:wiki-review": "node scripts/apply-wiki-review.mjs",
+    "export:wiki-csv": "node scripts/ndjson-to-csv.mjs",
+    "build": "npm run sync:data && npm run compile:wiki-nt-asset && node esbuild.config.mjs",
+    "smoke": "node scripts/smoke-test.mjs",
+    "test": "node --test 'src/**/*.test.mjs'",
+    "prepack": "npm run build"
+  }
 }
