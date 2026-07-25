@@ -1,0 +1,7 @@
+{
+  "name": "@ljb/plugin-cjk-dates",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Premodern East Asian date tagging plugin for LJB",
+  "ljbPlugin": true
+}

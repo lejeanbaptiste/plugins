@@ -1,0 +1,334 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://lejeanbaptiste.org/schemas/plugin-manifest/1.0.0",
+  "title": "LJB Plugin Manifest",
+  "description": "Describes an optional Le Jean-Baptiste plugin package for Tools → Plugins.",
+  "type": "object",
+  "required": [
+    "manifestVersion",
+    "id",
+    "name",
+    "version",
+    "description",
+    "license",
+    "ljb",
+    "entry"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "manifestVersion": {
+      "type": "string",
+      "const": "1.0.0",
+      "description": "Schema version. The LJB host rejects unknown major versions."
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9]*(-[a-z0-9]+)*$",
+      "description": "Stable plugin id (kebab-case), e.g. norbert, cjk-dates."
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Human-readable plugin name shown in the Plugins panel."
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+(-[0-9A-Za-z.-]+)?$",
+      "description": "Semver of this plugin package."
+    },
+    "description": {
+      "type": "string",
+      "minLength": 1
+    },
+    "author": {
+      "type": "string"
+    },
+    "homepage": {
+      "type": "string",
+      "format": "uri"
+    },
+    "license": {
+      "type": "string",
+      "minLength": 1
+    },
+    "ljb": {
+      "type": "object",
+      "required": ["minVersion"],
+      "additionalProperties": false,
+      "properties": {
+        "minVersion": {
+          "type": "string",
+          "description": "Minimum LJB desktop app version required."
+        },
+        "maxVersion": {
+          "type": "string",
+          "description": "Optional exclusive upper bound for incompatible hosts."
+        }
+      }
+    },
+    "languages": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 2 },
+      "uniqueItems": true,
+      "description": "BCP 47 language tags. Used for 'plugins available for this language' prompts."
+    },
+    "regions": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": ["east-asia", "china", "japan", "korea"]
+      },
+      "uniqueItems": true,
+      "description": "Broad cultural/period scope for discovery and grouping."
+    },
+    "languagePrompt": {
+      "type": "object",
+      "required": ["message"],
+      "additionalProperties": false,
+      "properties": {
+        "message": {
+          "type": "string",
+          "description": "Shown once when a matching document language is opened and the plugin is not installed."
+        },
+        "documentLanguages": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Override manifest languages for this prompt only."
+        }
+      }
+    },
+    "entry": {
+      "type": "object",
+      "required": ["kind"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": ["javascript", "python", "hybrid"],
+          "description": "javascript = bundled TS/JS module; python = IPC backend; hybrid = both."
+        },
+        "module": {
+          "type": "string",
+          "description": "Relative path to the JS entry (register.mjs / register.js)."
+        },
+        "python": {
+          "$ref": "#/$defs/pythonBackend"
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "kind": { "const": "javascript" } }, "required": ["kind"] },
+          "then": { "required": ["module"] }
+        },
+        {
+          "if": { "properties": { "kind": { "const": "python" } }, "required": ["kind"] },
+          "then": { "required": ["python"] }
+        },
+        {
+          "if": { "properties": { "kind": { "const": "hybrid" } }, "required": ["kind"] },
+          "then": { "required": ["module", "python"] }
+        }
+      ]
+    },
+    "contributions": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "toolsMenu": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/toolsMenuItem" }
+        },
+        "autoTagging": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/autoTaggingProducer" }
+        },
+        "authorityPacks": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/authorityPackContribution" }
+        },
+        "settingsSections": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/settingsSection" }
+        },
+        "disambiguation": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/disambiguationStrategy" }
+        }
+      }
+    },
+    "dependencies": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "plugins": {
+          "type": "array",
+          "items": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
+          "uniqueItems": true,
+          "description": "Other plugin ids that must be enabled first."
+        }
+      }
+    },
+    "bundled": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "description": "Relative paths shipped inside the plugin archive (data, python, packs)."
+    }
+  },
+  "$defs": {
+    "pythonBackend": {
+      "type": "object",
+      "required": ["module"],
+      "additionalProperties": false,
+      "properties": {
+        "module": {
+          "type": "string",
+          "description": "Importable Python module exposing the IPC bridge, e.g. sanmiao.ljb_bridge."
+        },
+        "runtime": {
+          "type": "string",
+          "enum": ["bundled", "system", "conda-env"],
+          "default": "bundled",
+          "description": "Where LJB finds the Python interpreter."
+        },
+        "runtimePath": {
+          "type": "string",
+          "description": "Relative path to bundled python tree or env name when runtime != system."
+        }
+      }
+    },
+    "toolsMenuItem": {
+      "type": "object",
+      "required": ["id", "label"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
+        "label": { "type": "string", "minLength": 1 },
+        "action": {
+          "type": "string",
+          "description": "Host action id dispatched when the menu item is chosen."
+        },
+        "separatorBefore": { "type": "boolean" }
+      }
+    },
+    "autoTaggingProducer": {
+      "type": "object",
+      "required": ["id", "label", "kind"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
+        "label": { "type": "string", "minLength": 1 },
+        "description": { "type": "string" },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "dates",
+            "authority-tag-bomb",
+            "contextual-disambiguation",
+            "pattern-tag",
+            "custom"
+          ]
+        },
+        "defaultEnabled": { "type": "boolean", "default": true },
+        "tags": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "TEI tags this producer may emit, e.g. date, persName, roleName."
+        }
+      }
+    },
+    "authorityPackContribution": {
+      "type": "object",
+      "required": ["id", "label", "install"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]*$",
+          "description": "Authority pack id registered with the LJB host (norbert-persons)."
+        },
+        "label": { "type": "string", "minLength": 1 },
+        "defaultTag": {
+          "type": "string",
+          "description": "Default TEI tag when seeding from this pack."
+        },
+        "install": {
+          "type": "object",
+          "required": ["source"],
+          "additionalProperties": false,
+          "properties": {
+            "source": {
+              "type": "string",
+              "enum": ["bundled", "authoritypacks-release", "url"]
+            },
+            "path": {
+              "type": "string",
+              "description": "Relative path inside the plugin when source=bundled."
+            },
+            "releaseId": {
+              "type": "string",
+              "description": "Release artifact name when source=authoritypacks-release."
+            },
+            "url": {
+              "type": "string",
+              "format": "uri",
+              "description": "Direct tarball/zip URL when source=url."
+            },
+            "manifestPath": {
+              "type": "string",
+              "description": "Path to the pack manifest.json within the installed tree."
+            }
+          },
+          "allOf": [
+            {
+              "if": { "properties": { "source": { "const": "bundled" } }, "required": ["source"] },
+              "then": { "required": ["path"] }
+            },
+            {
+              "if": {
+                "properties": { "source": { "const": "authoritypacks-release" } },
+                "required": ["source"]
+              },
+              "then": { "required": ["releaseId"] }
+            },
+            {
+              "if": { "properties": { "source": { "const": "url" } }, "required": ["source"] },
+              "then": { "required": ["url"] }
+            }
+          ]
+        }
+      }
+    },
+    "settingsSection": {
+      "type": "object",
+      "required": ["id", "label"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
+        "label": { "type": "string", "minLength": 1 },
+        "description": { "type": "string" }
+      }
+    },
+    "disambiguationStrategy": {
+      "type": "object",
+      "required": ["id", "label", "entityKind"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
+        "label": { "type": "string", "minLength": 1 },
+        "entityKind": {
+          "type": "string",
+          "enum": ["person", "place", "office", "date", "org", "work"]
+        },
+        "description": { "type": "string" },
+        "usesContextKeys": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["dynasty", "office", "place", "nationality", "compound-string"]
+          },
+          "description": "Norbert-style contextual keys used to narrow candidates."
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,7 @@
+{
+  "name": "@ljb/plugin-norbert",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Norbert Chinese prosopography plugin for LJB",
+  "ljbPlugin": true
+}

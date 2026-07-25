@@ -1,0 +1,15 @@
+{
+  "name": "ljb-plugins",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Optional plugins for Le Jean-Baptiste (LJB)",
+  "type": "module",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "validate": "node packages/plugin-sdk/validate-all.mjs",
+    "test": "node --test 'packages/**/*.test.mjs'"
+  },
+  "license": "GPL-2.0"
+}

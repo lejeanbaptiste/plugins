@@ -1,0 +1,10 @@
+{
+  "name": "@ljb/plugin-sdk",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "LJB plugin manifest types and validation",
+  "exports": {
+    ".": "./index.mjs"
+  }
+}
