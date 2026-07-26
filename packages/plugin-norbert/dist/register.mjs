@@ -765,7 +765,7 @@ var surnames_default = {
     "\u7E82",
     "\u5DE6"
   ],
-  compiledAt: "2026-07-26T07:28:53.542Z"
+  compiledAt: "2026-07-25T20:48:23.589Z"
 };
 
 // src/segmentPersonName.mjs
@@ -806,6 +806,43 @@ function inferConcatenatedOfficeRelation({ first, second, adjacent }) {
   };
 }
 
+// src/entityDataExtractor.mjs
+function extractNorbertEntityData({ wrapper }) {
+  const assertions = [];
+  const descendants = (name) => Array.from(wrapper.getElementsByTagName(name));
+  for (const node of descendants("nationality")) {
+    const value = node.textContent?.trim();
+    if (value) assertions.push({ element: "nationality", value, ref: node.getAttribute("ref") ?? void 0 });
+  }
+  for (const node of descendants("placeOfOrigin")) {
+    const value = node.textContent?.trim();
+    if (value) assertions.push({ element: "placeName", value, ref: node.getAttribute("ref") ?? void 0 });
+  }
+  for (const node of descendants("officeName")) {
+    const value = node.textContent?.trim();
+    if (value) assertions.push({ element: "state", value, ref: node.getAttribute("ref") ?? void 0 });
+  }
+  for (const node of descendants("nobleTitle")) {
+    const place = node.getElementsByTagName("placeName")[0];
+    const role = node.getElementsByTagName("roleName")[0];
+    const posthumous = Array.from(node.getElementsByTagName("persName")).find((person) => person.getAttribute("type") === "posthumous");
+    const value = node.textContent?.trim();
+    if (value) {
+      assertions.push({
+        element: "nobleTitle",
+        value,
+        ref: node.getAttribute("ref") ?? void 0,
+        children: [
+          ...place ? [{ element: "placeName", value: place.textContent?.trim() ?? "", ref: place.getAttribute("ref") ?? void 0 }] : [],
+          ...role ? [{ element: "roleName", value: role.textContent?.trim() ?? "", ref: role.getAttribute("ref") ?? void 0 }] : [],
+          ...posthumous ? [{ element: "persName", value: posthumous.textContent?.trim() ?? "", ref: posthumous.getAttribute("ref") ?? void 0 }] : []
+        ]
+      });
+    }
+  }
+  return assertions;
+}
+
 // src/register.mjs
 function register(context) {
   const surnames = surnames_default.surnames ?? [];
@@ -818,6 +855,7 @@ function register(context) {
     };
   });
   context.registerOfficeRelationExtractor?.(inferConcatenatedOfficeRelation);
+  context.registerEntityDataExtractor?.(extractNorbertEntityData);
   context.log(`person-name segmenter ready (${surnames.length} surnames)`);
 }
 export {

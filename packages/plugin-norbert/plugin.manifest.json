@@ -72,6 +72,16 @@
         }
       },
       {
+        "id": "norbert-person-wrappers",
+        "label": "Norbert person wrappers",
+        "defaultTag": "persName",
+        "install": {
+          "source": "authoritypacks-release",
+          "releaseId": "authority-packs-chinese",
+          "manifestPath": "norbert/manifest.json"
+        }
+      },
+      {
         "id": "norbert-offices",
         "label": "Norbert offices (官名)",
         "defaultTag": "roleName",
@@ -79,6 +89,15 @@
           "source": "authoritypacks-release",
           "releaseId": "authority-packs-chinese",
           "manifestPath": "norbert/manifest.json"
+        }
+      },
+      {
+        "id": "norbert-wiki-nt",
+        "label": "Norbert + Wikipedia noble titles",
+        "defaultTag": "persName",
+        "install": {
+          "source": "bundled",
+          "path": "data/wiki-nt-links.ndjson"
         }
       }
     ],
@@ -113,6 +132,7 @@
     "dist/register.mjs",
     "data/surnames.json",
     "data/geo-admin-suffixes.json",
+    "data/wiki-nt-links.ndjson",
     "data/wiki-nt-links.json",
     "python"
   ]

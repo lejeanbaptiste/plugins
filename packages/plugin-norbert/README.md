@@ -169,10 +169,16 @@ When enabled, the auto-tagging dialog offers:
 
 - **Norbert persons** → `persName` tag bomb
 - **Norbert offices (官名)** → `roleName` tag bomb (period-tuned office strings from your Norbert SQL)
+- **Norbert + Wikipedia noble titles** → bundled `persName` pack for fief + rank + person combinations, with the Wikipedia-reviewed rows merged into the Norbert title pattern set
 
 Use alongside **CBDB offices** for broader coverage. Each Norbert row keeps its
 own source id; conservatively matched rows also carry the canonical CBDB office
 id.
+
+The noble-title asset is shipped as `data/wiki-nt-links.ndjson` and is generated
+from the review workflow in this plugin, not copied directly from the SQL dump.
+That keeps the runtime pack portable while still preserving the Norbert + wiki
+crosswalk needed for tagging and disambiguation.
 
 The plugin owns Norbert's position-sensitive office rule. When a resolved
 office marked `followsOffice` immediately follows another resolved office, LJB

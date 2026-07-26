@@ -100,6 +100,12 @@ Registers pack ids with the entity-database folder. Install sources:
 | `authoritypacks-release` | Download from the authoritypacks release tarball. |
 | `url` | Direct URL to a pack archive. |
 
+Bundled packs are for plugin-local runtime assets, not for the public
+authority-packs CI tarball. Norbert uses this for the shipped
+`data/wiki-nt-links.ndjson` noble-title crosswalk: it lives with the plugin so
+the tagger can use it for person-wrapper / noble-title disambiguation without
+writing hypothetical rows into `entities.xml`.
+
 Norbert example (pulls from authoritypacks release):
 
 ```json

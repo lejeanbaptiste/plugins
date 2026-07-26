@@ -13,6 +13,7 @@
  * @property {(moduleId: string) => Promise<{ registerCjkDatesUi?: (context: PluginRegisterContext) => void }>} loadHostModule
  * @property {(segmenter: (input: { name: string; projectLang: string | null; romanize: (part: string) => string | null }) => { familyName: string; givenName: string; romanizedName?: string | null } | null) => void} registerPersonNameSegmenter
  * @property {(extractor: (input: { first: unknown, second: unknown, adjacent: boolean }) => { source: string, rule: string, sourceIds: string[], confidence: 'asserted'|'inferred' } | null) => void} [registerOfficeRelationExtractor]
+ * @property {(extractor: (input: { wrapper: Element, documentKey: string }) => Array<{ element: string, value: string, ref?: string, children?: Array<{ element: string, value: string, ref?: string }> }>) => void} [registerEntityDataExtractor]
  * @property {() => void} [onEnable]
  * @property {() => void} [onDisable]
  */
