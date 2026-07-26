@@ -170,7 +170,15 @@ When enabled, the auto-tagging dialog offers:
 - **Norbert persons** → `persName` tag bomb
 - **Norbert offices (官名)** → `roleName` tag bomb (period-tuned office strings from your Norbert SQL)
 
-Use alongside **CBDB offices** for broader coverage; Norbert offices include flags for the future concatenate pass (`geoAdminSuffix`, `placeCat`).
+Use alongside **CBDB offices** for broader coverage. Each Norbert row keeps its
+own source id; conservatively matched rows also carry the canonical CBDB office
+id.
+
+The plugin owns Norbert's position-sensitive office rule. When a resolved
+office marked `followsOffice` immediately follows another resolved office, LJB
+retains the first as the inferred parent of the second and writes a
+provenance-bearing `parentOf` assertion to `entities.xml`. Place + office
+constructions remain contextual tagging and do not become office hierarchy.
 
 ## Enable in LJB
 

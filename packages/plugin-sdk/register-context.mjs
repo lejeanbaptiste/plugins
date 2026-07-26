@@ -12,6 +12,7 @@
  * @property {(item: { id: string; icon: string; title: string; tooltip?: string; group?: string; isAvailable: () => boolean; onClick: (ctx: { openCalendar: (notice?: string) => void }) => void }) => void} registerToolbarItem
  * @property {(moduleId: string) => Promise<{ registerCjkDatesUi?: (context: PluginRegisterContext) => void }>} loadHostModule
  * @property {(segmenter: (input: { name: string; projectLang: string | null; romanize: (part: string) => string | null }) => { familyName: string; givenName: string; romanizedName?: string | null } | null) => void} registerPersonNameSegmenter
+ * @property {(extractor: (input: { first: unknown, second: unknown, adjacent: boolean }) => { source: string, rule: string, sourceIds: string[], confidence: 'asserted'|'inferred' } | null) => void} [registerOfficeRelationExtractor]
  * @property {() => void} [onEnable]
  * @property {() => void} [onDisable]
  */

@@ -765,7 +765,7 @@ var surnames_default = {
     "\u7E82",
     "\u5DE6"
   ],
-  compiledAt: "2026-07-25T20:48:23.589Z"
+  compiledAt: "2026-07-26T07:28:53.542Z"
 };
 
 // src/segmentPersonName.mjs
@@ -792,6 +792,20 @@ function romanizeSplitParts(split, romanize, fallbackName) {
   return romanize(fallbackName) ?? null;
 }
 
+// src/officeRelations.mjs
+function inferConcatenatedOfficeRelation({ first, second, adjacent }) {
+  if (!adjacent) return null;
+  if (first?.kind !== "office" || second?.kind !== "office") return null;
+  if (String(second.source).toLowerCase() !== "norbert") return null;
+  if (!second.metadata?.followsOffice) return null;
+  return {
+    source: "norbert",
+    rule: "office-concatenation",
+    sourceIds: [String(first.authorityId), String(second.authorityId)],
+    confidence: "inferred"
+  };
+}
+
 // src/register.mjs
 function register(context) {
   const surnames = surnames_default.surnames ?? [];
@@ -803,6 +817,7 @@ function register(context) {
       romanizedName: romanizeSplitParts(split, romanize, name)
     };
   });
+  context.registerOfficeRelationExtractor?.(inferConcatenatedOfficeRelation);
   context.log(`person-name segmenter ready (${surnames.length} surnames)`);
 }
 export {
