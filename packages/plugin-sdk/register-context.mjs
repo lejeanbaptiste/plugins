@@ -11,6 +11,7 @@
  * @property {(matcher: (suggestions: unknown[]) => boolean, component: unknown, options?: { finishWhenIdle?: boolean | ((suggestions: unknown[]) => boolean) }) => void} registerReviewPanel
  * @property {(item: { id: string; icon: string; title: string; tooltip?: string; group?: string; isAvailable: () => boolean; onClick: (ctx: { openCalendar: (notice?: string) => void }) => void }) => void} registerToolbarItem
  * @property {(moduleId: string) => Promise<{ registerCjkDatesUi?: (context: PluginRegisterContext) => void }>} loadHostModule
+ * @property {(segmenter: (input: { name: string; projectLang: string | null; romanize: (part: string) => string | null }) => { familyName: string; givenName: string; romanizedName?: string | null } | null) => void} registerPersonNameSegmenter
  * @property {() => void} [onEnable]
  * @property {() => void} [onDisable]
  */
