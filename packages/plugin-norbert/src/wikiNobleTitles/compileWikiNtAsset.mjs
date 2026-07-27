@@ -105,15 +105,75 @@ export function planToAssetRecord(plan, row, index) {
     person: plan.personBare,
   });
 
+  // The wiki asset is deliberately still a compact, structured input to the
+  // Norbert runtime.  It is not the output of name expansion.  These fields
+  // provide the AuthorityCandidate envelope required by LJB's strict NDJSON
+  // loader while retaining the original structured payload below.
+  const personAuthorityId =
+    norbertPersonId ?? (wiki.wikidataId ? `wikidata:${wiki.wikidataId}` : null);
+  const titleSurface = [wiki.fief, wiki.pn, wiki.nt].filter(Boolean).join('');
+  const primaryName = wiki.person || titleSurface || wiki.sourcePage;
+  const searchStrings = buildNtSearchStrings(wiki);
+  // Some review rows are person/Wikidata links from pages whose title
+  // components could not be recovered. They are useful review evidence, but
+  // they are not taggable noble-title records and must not be emitted as
+  // malformed authority rows.
+  if (searchStrings.length === 0) return null;
+  const wrapperSearchStrings = wiki.person
+    ? searchStrings.filter((surface) => surface.endsWith(wiki.person))
+    : [];
+  const titleSearchStrings = wiki.person
+    ? searchStrings.filter((surface) => !surface.endsWith(wiki.person))
+    : searchStrings;
+  const components = {
+    nationality: undefined,
+    fief: wiki.fief ?? undefined,
+    roleName: wiki.nt ?? undefined,
+    posthumousName: wiki.pn ?? undefined,
+    persName: wiki.person ?? undefined,
+  };
+  const wrapper = personAuthorityId && wiki.person
+    ? {
+        personId: personAuthorityId,
+        titleRowId: `wnt-${String(index + 1).padStart(4, '0')}`,
+        components,
+      }
+    : undefined;
+
   return {
     id: `wnt-${String(index + 1).padStart(4, '0')}`,
+    source: 'norbert-wikipedia',
+    authorityId: `wiki-nt:${String(index + 1).padStart(4, '0')}`,
+    kind: 'person',
+    primaryName,
     action,
     matchKey,
-    searchStrings: buildNtSearchStrings(wiki),
+    searchStrings,
+    names: wiki.person ? [{ text: wiki.person, type: 'wrapper-person' }] : [],
     wiki,
     norbert,
     proposedNt,
     reviewerNotes: row.reviewer_notes ?? null,
+    metadata: {
+      isNobleTitle: true,
+      teiTag: wrapper ? undefined : 'nobleTitle',
+      sourceRef: wiki.sourcePageUrl ?? wiki.sourcePage ?? undefined,
+      dynasty: wiki.dyn ?? undefined,
+      startYear: wiki.startYear ?? undefined,
+      endYear: wiki.endYear ?? undefined,
+      crosswalk: {
+        ...(wiki.wikidataId ? { wikidata: [wiki.wikidataId] } : {}),
+        ...(norbertPersonId ? { norbert: norbertPersonId } : {}),
+      },
+      wrapper,
+      wrapperSearchStrings,
+      titleSearchStrings,
+      nobleTitle: {
+        fief: wiki.fief ?? undefined,
+        roleName: wiki.nt ?? undefined,
+        posthumousName: wiki.pn ?? undefined,
+      },
+    },
   };
 }
 

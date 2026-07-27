@@ -50,14 +50,6 @@
         "kind": "contextual-disambiguation",
         "defaultEnabled": true,
         "tags": ["persName", "roleName", "placeName"]
-      },
-      {
-        "id": "norbert-noble-titles",
-        "label": "Noble titles and abbreviated princely names",
-        "description": "Tag patterns like 鄱陽王 + given name using structured office/place/name combinations.",
-        "kind": "pattern-tag",
-        "defaultEnabled": true,
-        "tags": ["persName", "roleName", "placeName"]
       }
     ],
     "authorityPacks": [

@@ -180,6 +180,16 @@ from the review workflow in this plugin, not copied directly from the SQL dump.
 That keeps the runtime pack portable while still preserving the Norbert + wiki
 crosswalk needed for tagging and disambiguation.
 
+At runtime these rows are wrapped in the LJB `AuthorityCandidate` envelope but
+remain structured and compact. LJB expands their fief, rank, posthumous name,
+and personal-name combinations when the `norbert-wiki-nt` pack is loaded. The
+runtime keeps full person-wrapper strings separate from standalone noble-title
+strings, so a title-only hit cannot create a person wrapper. Rows with no
+recoverable title string are retained only in the review workflow and are not
+shipped as taggable candidates. When the Norbert persons pack is loaded in the
+same run, its current alternate names are merged by Norbert person ID before
+the wiki-title combinations are generated.
+
 The plugin owns Norbert's position-sensitive office rule. When a resolved
 office marked `followsOffice` immediately follows another resolved office, LJB
 retains the first as the inferred parent of the second and writes a

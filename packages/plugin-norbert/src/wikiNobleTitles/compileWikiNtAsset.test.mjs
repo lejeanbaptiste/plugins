@@ -65,6 +65,52 @@ test('title_only records have wiki but no norbert', () => {
   assert.equal(record?.wiki.fief, '南康');
 });
 
+test('compiled records have the AuthorityCandidate envelope without expanding strings', () => {
+  const plan = buildApplyPlan(
+    {
+      suggestedAction: 'link',
+      fief: '江陽',
+      nt: '公',
+      personBare: '王瑊',
+      wikidataId: 'Q45495174',
+    },
+    new Map(),
+  );
+  const record = planToAssetRecord(plan, plan, 0);
+  assert.equal(record?.source, 'norbert-wikipedia');
+  assert.equal(record?.authorityId, 'wiki-nt:0001');
+  assert.equal(record?.kind, 'person');
+  assert.equal(record?.primaryName, '王瑊');
+  assert.deepEqual(record?.searchStrings, ['江陽公', '江陽公王瑊']);
+  assert.equal(record?.metadata.wrapper.personId, 'wikidata:Q45495174');
+  assert.equal(record?.metadata.wrapper.components.fief, '江陽');
+  assert.equal(record?.metadata.wrapper.components.roleName, '公');
+});
+
+test('title-only rows retain a candidate envelope without pretending to be a person wrapper', () => {
+  const plan = buildApplyPlan(
+    {
+      matchStatus: 'wiki_only',
+      fief: '南平',
+      nt: '王',
+      personBare: null,
+    },
+    new Map(),
+  );
+  const record = planToAssetRecord(plan, plan, 0);
+  assert.equal(record?.primaryName, '南平王');
+  assert.equal(record?.metadata.wrapper, undefined);
+  assert.equal(record?.metadata.nobleTitle.roleName, '王');
+});
+
+test('rows without recoverable title strings are omitted', () => {
+  const plan = buildApplyPlan(
+    { suggestedAction: 'link', personBare: '陸麗', wikidataId: 'Q4996469' },
+    new Map(),
+  );
+  assert.equal(planToAssetRecord(plan, plan, 0), null);
+});
+
 test('compileWikiNtAsset skips rejected rows', () => {
   const asset = compileWikiNtAsset(
     [
