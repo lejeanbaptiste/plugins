@@ -71,6 +71,17 @@ const reviewCsv = path.resolve(__dirname, '../data', arg('--review', 'wiki-norbe
 const outJson = path.resolve(__dirname, '../data', arg('--out', 'wiki-nt-links.json'));
 const outNdjson = path.resolve(__dirname, '../data', arg('--ndjson', 'wiki-nt-links.ndjson'));
 
+// The raw review NDJSON is intentionally gitignored. Release builds run from
+// the standalone plugins repository, where the reviewed compiled assets are
+// the source of truth unless a maintainer explicitly supplies --in.
+if (!fs.existsSync(ndjsonPath)) {
+  if (fs.existsSync(outJson) && fs.existsSync(outNdjson)) {
+    console.warn(`Missing ${ndjsonPath} — keeping checked-in wiki-nt assets`);
+    process.exit(0);
+  }
+  throw new Error(`Missing ${ndjsonPath}; provide the review source with --in or commit the compiled assets.`);
+}
+
 const rows = fs.readFileSync(ndjsonPath, 'utf8').trim().split('\n').map((line, index) => ({
   review_id: index + 1,
   ...JSON.parse(line),
