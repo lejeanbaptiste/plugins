@@ -20,6 +20,7 @@ Each plugin folder contains **`plugin.manifest.json`** — the contract the LJB 
 
 ```bash
 npm run validate    # check all plugin.manifest.json files
+npm run release     # build GitHub Release archives and plugins-index.json
 ```
 
 ## Plugins (planned)
@@ -37,3 +38,13 @@ npm run validate    # check all plugin.manifest.json files
 ## Documentation
 
 See [`docs/manifest.md`](docs/manifest.md) for the full manifest format.
+
+## Releases
+
+`npm run release` builds each plugin's runtime entry and emits a versioned
+`ljb-plugin-<id>-<version>.tar.gz` archive plus `plugins-index.json`. The
+`build-plugins` GitHub Actions workflow publishes those files as release
+assets when a `v*` tag is pushed. LJB fetches that index from the latest
+release, verifies the archive SHA-256, checks archive paths, and installs the
+package under its per-user plugin directory. Platform-specific Python
+runtimes are downloaded after installation, so archives remain portable.

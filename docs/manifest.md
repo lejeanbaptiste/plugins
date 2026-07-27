@@ -129,16 +129,20 @@ Strategies shown in the disambiguation panel. Norbert uses `usesContextKeys` to 
 
 Optional sections added to the Settings dialog when the plugin is enabled.
 
-## Host behaviour (planned in LJB)
+## Host behaviour
 
 1. User opens **Tools → Plugins…**
 2. Host lists installed plugins by reading each folder’s `plugin.manifest.json`
-3. Enabling a plugin:
+   and checks the plugins repository's release index for new versions.
+3. A new installation or update downloads the versioned archive, verifies its
+   SHA-256, validates its manifest, and installs it under the per-user plugin
+   directory.
+4. Enabling a plugin:
    - loads `entry.module` (JS)
    - starts Python IPC if `entry.python` is set
    - installs declared authority packs
    - merges menu items and auto-tagging producers
-4. On document open, if `languagePrompt` matches and the plugin is not installed, show a one-time nudge
+5. On document open, if `languagePrompt` matches and the plugin is not installed, show a one-time nudge
 
 ## Schema
 

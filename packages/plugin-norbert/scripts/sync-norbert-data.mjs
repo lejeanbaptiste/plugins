@@ -13,8 +13,11 @@ const files = ['surnames.json', 'geo-admin-suffixes.json'];
 for (const file of files) {
   const src = path.join(packDir, file);
   if (!fs.existsSync(src)) {
-    console.error(`Missing ${src} — run: cd authoritypacks && npm run compile:norbert`);
-    process.exit(1);
+    // Release builds run from the standalone plugins repository. The checked-in
+    // data is the reviewed fallback; maintainers can refresh it from the
+    // sibling authoritypacks checkout during development.
+    console.warn(`Missing ${src} — keeping checked-in ${file}`);
+    continue;
   }
   fs.mkdirSync(outDir, { recursive: true });
   fs.copyFileSync(src, path.join(outDir, file));
