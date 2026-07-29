@@ -843,6 +843,448 @@ function extractNorbertEntityData({ wrapper }) {
   return assertions;
 }
 
+// data/geo-admin-suffixes.json
+var geo_admin_suffixes_default = {
+  suffixes: [
+    {
+      string: "\u5317\u4E2D\u5E9C",
+      placeCat: "\u5E9C",
+      norbertId: "340"
+    },
+    {
+      string: "\u4F2F",
+      norbertId: "408"
+    },
+    {
+      string: "\u5009",
+      norbertId: "449"
+    },
+    {
+      string: "\u4E1E",
+      norbertId: "323"
+    },
+    {
+      string: "\u4E1E\u76F8\u5E9C",
+      placeCat: "\u5E9C",
+      norbertId: "2155"
+    },
+    {
+      string: "\u523A\u53F2",
+      placeCat: "\u5DDE",
+      norbertId: "534"
+    },
+    {
+      string: "\u6771\u4E2D\u5E9C",
+      placeCat: "\u5E9C",
+      norbertId: "343"
+    },
+    {
+      string: "\u4E8C\u885E\u5E9C",
+      placeCat: "\u5E9C",
+      norbertId: "18"
+    },
+    {
+      string: "\u516C",
+      norbertId: "497"
+    },
+    {
+      string: "\u570B\u76F8",
+      norbertId: "2016"
+    },
+    {
+      string: "\u4FAF",
+      norbertId: "441"
+    },
+    {
+      string: "\u5019",
+      norbertId: "452"
+    },
+    {
+      string: "\u8B77\u8ECD\u5E9C",
+      placeCat: "\u5E9C",
+      norbertId: "260"
+    },
+    {
+      string: "\u76E3",
+      norbertId: "1363"
+    },
+    {
+      string: "\u76E3\u9580\u5E9C",
+      placeCat: "\u5E9C",
+      norbertId: "213"
+    },
+    {
+      string: "\u5C07",
+      norbertId: "690"
+    },
+    {
+      string: "\u6A02\u5E9C",
+      placeCat: "\u5E9C",
+      norbertId: "2265"
+    },
+    {
+      string: "\u9675",
+      norbertId: "1632"
+    },
+    {
+      string: "\u9818\u5DE6\u53F3\u5E9C",
+      placeCat: "\u5E9C",
+      norbertId: "286"
+    },
+    {
+      string: "\u9818\u5DE6\u53F3\u885E\u5E9C",
+      placeCat: "\u5E9C",
+      norbertId: "287"
+    },
+    {
+      string: "\u4EE4",
+      placeCat: "\u7E23",
+      norbertId: "397"
+    },
+    {
+      string: "\u7267",
+      norbertId: "1278"
+    },
+    {
+      string: "\u7537",
+      norbertId: "1326"
+    },
+    {
+      string: "\u5357\u4E2D\u5E9C",
+      placeCat: "\u5E9C",
+      norbertId: "341"
+    },
+    {
+      string: "\u5167\u7387\u5E9C",
+      placeCat: "\u5E9C",
+      norbertId: "492"
+    },
+    {
+      string: "\u5E73",
+      norbertId: "1061"
+    },
+    {
+      string: "\u4E09\u516C\u5E9C",
+      placeCat: "\u5E9C",
+      norbertId: "305"
+    },
+    {
+      string: "\u53F2",
+      norbertId: "581"
+    },
+    {
+      string: "\u56DB\u5E9C",
+      placeCat: "\u5E9C",
+      norbertId: "618"
+    },
+    {
+      string: "\u56DB\u4E2D\u5E9C",
+      placeCat: "\u5E9C",
+      norbertId: "342"
+    },
+    {
+      string: "\u592A\u5B88",
+      placeCat: "\u90E1",
+      norbertId: "660"
+    },
+    {
+      string: "\u738B",
+      norbertId: "1311"
+    },
+    {
+      string: "\u6B66\u5019\u5E9C",
+      placeCat: "\u5E9C",
+      norbertId: "187"
+    },
+    {
+      string: "\u6B66\u885E\u5E9C",
+      placeCat: "\u5E9C",
+      norbertId: "192"
+    },
+    {
+      string: "\u897F\u4E2D\u5E9C",
+      placeCat: "\u5E9C",
+      norbertId: "344"
+    },
+    {
+      string: "\u76F8",
+      norbertId: "1419"
+    },
+    {
+      string: "\u7FCA\u885E\u5E9C",
+      placeCat: "\u5E9C",
+      norbertId: "230"
+    },
+    {
+      string: "\u5C39",
+      norbertId: "384"
+    },
+    {
+      string: "\u9DF9\u63DA\u5E9C",
+      placeCat: "\u5E9C",
+      norbertId: "1667"
+    },
+    {
+      string: "\u53F3\u76E3\u9580\u5E9C",
+      placeCat: "\u5E9C",
+      norbertId: "210"
+    },
+    {
+      string: "\u53F3\u76E3\u9580\u7387\u5E9C",
+      placeCat: "\u5E9C",
+      norbertId: "1380"
+    },
+    {
+      string: "\u53F3\u9818\u8ECD\u5E9C",
+      placeCat: "\u5E9C",
+      norbertId: "288"
+    },
+    {
+      string: "\u53F3\u7387\u5E9C",
+      placeCat: "\u5E9C",
+      norbertId: "1302"
+    },
+    {
+      string: "\u53F3\u5167\u7387\u5E9C",
+      placeCat: "\u5E9C",
+      norbertId: "489"
+    },
+    {
+      string: "\u53F3\u885E\u5E9C",
+      placeCat: "\u5E9C",
+      norbertId: "252"
+    },
+    {
+      string: "\u53F3\u6B66\u5019\u5E9C",
+      placeCat: "\u5E9C",
+      norbertId: "184"
+    },
+    {
+      string: "\u53F3\u6B66\u885E\u5E9C",
+      placeCat: "\u5E9C",
+      norbertId: "189"
+    },
+    {
+      string: "\u53F3\u96C4\u6B66\u5E9C",
+      placeCat: "\u5E9C",
+      norbertId: "280"
+    },
+    {
+      string: "\u53F3\u7FCA\u885E\u5E9C",
+      placeCat: "\u5E9C",
+      norbertId: "228"
+    },
+    {
+      string: "\u53F3\u865E\u5019\u5E9C",
+      placeCat: "\u5E9C",
+      norbertId: "244"
+    },
+    {
+      string: "\u53F3\u5B97\u885E\u5E9C",
+      placeCat: "\u5E9C",
+      norbertId: "122"
+    },
+    {
+      string: "\u8A79\u4E8B\u5E9C",
+      placeCat: "\u5E9C",
+      norbertId: "1504"
+    },
+    {
+      string: "\u9577",
+      norbertId: "1608"
+    },
+    {
+      string: "\u6B63",
+      norbertId: "1203"
+    },
+    {
+      string: "\u4E2D\u5E9C",
+      placeCat: "\u5E9C",
+      norbertId: "339"
+    },
+    {
+      string: "\u8AF8\u5E9C",
+      placeCat: "\u5E9C",
+      norbertId: "1507"
+    },
+    {
+      string: "\u4E3B",
+      norbertId: "369"
+    },
+    {
+      string: "\u5B50",
+      norbertId: "676"
+    },
+    {
+      string: "\u5DE6\u76E3\u9580\u5E9C",
+      placeCat: "\u5E9C",
+      norbertId: "211"
+    },
+    {
+      string: "\u5DE6\u76E3\u9580\u7387\u5E9C",
+      placeCat: "\u5E9C",
+      norbertId: "1382"
+    },
+    {
+      string: "\u5DE6\u9818\u8ECD\u5E9C",
+      placeCat: "\u5E9C",
+      norbertId: "289"
+    },
+    {
+      string: "\u5DE6\u7387\u5E9C",
+      placeCat: "\u5E9C",
+      norbertId: "1300"
+    },
+    {
+      string: "\u5DE6\u5167\u7387\u5E9C",
+      placeCat: "\u5E9C",
+      norbertId: "490"
+    },
+    {
+      string: "\u5DE6\u885E\u5E9C",
+      placeCat: "\u5E9C",
+      norbertId: "253"
+    },
+    {
+      string: "\u5DE6\u6B66\u5019\u5E9C",
+      placeCat: "\u5E9C",
+      norbertId: "185"
+    },
+    {
+      string: "\u5DE6\u6B66\u885E\u5E9C",
+      placeCat: "\u5E9C",
+      norbertId: "190"
+    },
+    {
+      string: "\u5DE6\u96C4\u6B66\u5E9C",
+      placeCat: "\u5E9C",
+      norbertId: "279"
+    },
+    {
+      string: "\u5DE6\u7FCA\u885E\u5E9C",
+      placeCat: "\u5E9C",
+      norbertId: "227"
+    },
+    {
+      string: "\u5DE6\u53F3\u5099\u8EAB\u5E9C",
+      placeCat: "\u5E9C",
+      norbertId: "458"
+    },
+    {
+      string: "\u5DE6\u53F3\u5019\u885E\u5E9C",
+      placeCat: "\u5E9C",
+      norbertId: "25"
+    },
+    {
+      string: "\u5DE6\u53F3\u76E3\u9580\u5E9C",
+      placeCat: "\u5E9C",
+      norbertId: "212"
+    },
+    {
+      string: "\u5DE6\u53F3\u76E3\u9580\u7387\u5E9C",
+      placeCat: "\u5E9C",
+      norbertId: "1385"
+    },
+    {
+      string: "\u5DE6\u53F3\u9818\u8ECD\u5E9C",
+      placeCat: "\u5E9C",
+      norbertId: "290"
+    },
+    {
+      string: "\u5DE6\u53F3\u9818\u5DE6\u53F3\u5E9C",
+      placeCat: "\u5E9C",
+      norbertId: "285"
+    },
+    {
+      string: "\u5DE6\u53F3\u7387\u5E9C",
+      placeCat: "\u5E9C",
+      norbertId: "1305"
+    },
+    {
+      string: "\u5DE6\u53F3\u5167\u7387\u5E9C",
+      placeCat: "\u5E9C",
+      norbertId: "491"
+    },
+    {
+      string: "\u5DE6\u53F3\u885E\u5E9C",
+      placeCat: "\u5E9C",
+      norbertId: "254"
+    },
+    {
+      string: "\u5DE6\u53F3\u6B66\u5019\u5E9C",
+      placeCat: "\u5E9C",
+      norbertId: "186"
+    },
+    {
+      string: "\u5DE6\u53F3\u6B66\u885E\u5E9C",
+      placeCat: "\u5E9C",
+      norbertId: "191"
+    },
+    {
+      string: "\u5DE6\u53F3\u96C4\u6B66\u5E9C",
+      placeCat: "\u5E9C",
+      norbertId: "281"
+    },
+    {
+      string: "\u5DE6\u53F3\u7FCA\u885E\u5E9C",
+      placeCat: "\u5E9C",
+      norbertId: "229"
+    },
+    {
+      string: "\u5DE6\u53F3\u865E\u5019\u5E9C",
+      placeCat: "\u5E9C",
+      norbertId: "246"
+    },
+    {
+      string: "\u5DE6\u53F3\u5B97\u885E\u5E9C",
+      placeCat: "\u5E9C",
+      norbertId: "121"
+    },
+    {
+      string: "\u5DE6\u865E\u5019\u5E9C",
+      placeCat: "\u5E9C",
+      norbertId: "245"
+    },
+    {
+      string: "\u5DE6\u5B97\u885E\u5E9C",
+      placeCat: "\u5E9C",
+      norbertId: "123"
+    }
+  ],
+  compiledAt: "2026-07-25T20:48:23.581Z"
+};
+
+// src/nobleTitlePatternProducer.mjs
+var PRINCELY_RANKS = /* @__PURE__ */ new Set(["\u738B", "\u516C", "\u4FAF", "\u4F2F", "\u5B50", "\u7537"]);
+function buildNobleTitlePatternCandidates() {
+  const ranks = (geo_admin_suffixes_default.suffixes ?? []).map((entry) => entry.string).filter((string) => PRINCELY_RANKS.has(string));
+  const surnames = surnames_default.surnames ?? [];
+  const candidates = [];
+  for (const rank of ranks) {
+    for (const surname of surnames) {
+      const id = `pattern:${rank}:${surname}`;
+      candidates.push({
+        source: "norbert-pattern",
+        authorityId: id,
+        kind: "person",
+        primaryName: surname,
+        searchStrings: [`${rank}${surname}`],
+        metadata: {
+          wrapper: {
+            personId: id,
+            titleRowId: id,
+            components: { roleName: rank, persName: surname }
+          }
+        }
+      });
+    }
+  }
+  return candidates;
+}
+function registerNobleTitlePatternProducer(context) {
+  context.registerPatternTagProducer?.(buildNobleTitlePatternCandidates);
+}
+
 // src/register.mjs
 function register(context) {
   const surnames = surnames_default.surnames ?? [];
@@ -856,6 +1298,7 @@ function register(context) {
   });
   context.registerOfficeRelationExtractor?.(inferConcatenatedOfficeRelation);
   context.registerEntityDataExtractor?.(extractNorbertEntityData);
+  registerNobleTitlePatternProducer(context);
   context.log(`person-name segmenter ready (${surnames.length} surnames)`);
 }
 export {
