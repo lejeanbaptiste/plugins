@@ -6,10 +6,12 @@ import { registerNobleTitlePatternProducer } from './nobleTitlePatternProducer.m
 
 /** @typedef {import('@ljb/plugin-sdk/register-context').PluginRegisterContext} PluginRegisterContext */
 
+const HOST_NOBLE_TITLE_UI_MODULE = 'norbert-noble-title-ui';
+
 /**
  * @param {PluginRegisterContext} context
  */
-export function register(context) {
+export async function register(context) {
   const surnames = surnamesData.surnames ?? [];
   context.registerPersonNameSegmenter(({ name, romanize }) => {
     const split = segmentPersonName(name, surnames);
@@ -23,4 +25,13 @@ export function register(context) {
   context.registerEntityDataExtractor?.(extractNorbertEntityData);
   registerNobleTitlePatternProducer(context);
   context.log(`person-name segmenter ready (${surnames.length} surnames)`);
+
+  // Toolbar/dialog UI is loaded from the LJB host (webpack bundle) via
+  // loadHostModule, same as plugin-cjk-dates, so this package stays small
+  // and does not duplicate React/MUI.
+  const ui = await context.loadHostModule(HOST_NOBLE_TITLE_UI_MODULE);
+  if (typeof ui.registerNorbertNobleTitleUi !== 'function') {
+    throw new Error(`${HOST_NOBLE_TITLE_UI_MODULE} is missing registerNorbertNobleTitleUi`);
+  }
+  ui.registerNorbertNobleTitleUi(context);
 }

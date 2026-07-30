@@ -1286,7 +1286,8 @@ function registerNobleTitlePatternProducer(context) {
 }
 
 // src/register.mjs
-function register(context) {
+var HOST_NOBLE_TITLE_UI_MODULE = "norbert-noble-title-ui";
+async function register(context) {
   const surnames = surnames_default.surnames ?? [];
   context.registerPersonNameSegmenter(({ name, romanize }) => {
     const split = segmentPersonName(name, surnames);
@@ -1300,6 +1301,11 @@ function register(context) {
   context.registerEntityDataExtractor?.(extractNorbertEntityData);
   registerNobleTitlePatternProducer(context);
   context.log(`person-name segmenter ready (${surnames.length} surnames)`);
+  const ui = await context.loadHostModule(HOST_NOBLE_TITLE_UI_MODULE);
+  if (typeof ui.registerNorbertNobleTitleUi !== "function") {
+    throw new Error(`${HOST_NOBLE_TITLE_UI_MODULE} is missing registerNorbertNobleTitleUi`);
+  }
+  ui.registerNorbertNobleTitleUi(context);
 }
 export {
   register
