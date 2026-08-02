@@ -23,11 +23,15 @@ export function buildNtSearchStrings(parts) {
   if (fief && nt) add(`${fief}${nt}`);
   if (fief && pn && nt && person) add(`${fief}${pn}${nt}${person}`);
   if (fief && nt && person) add(`${fief}${nt}${person}`);
+  if (!fief && pn && nt) add(`${pn}${nt}`);
+  if (!fief && pn && nt && person) add(`${pn}${nt}${person}`);
   // Skip the dyn-prefixed variants when dyn === fief (e.g. Liu Bei's 漢昭烈帝,
   // where Norbert records both dyn and fief as "漢") — they'd otherwise
   // duplicate into a garbled "漢漢昭烈帝".
   if (dyn && fief && dyn !== fief && pn && nt) add(`${dyn}${fief}${pn}${nt}`);
   if (dyn && fief && dyn !== fief && pn && nt && person) add(`${dyn}${fief}${pn}${nt}${person}`);
+  if (dyn && !fief && pn && nt) add(`${dyn}${pn}${nt}`);
+  if (dyn && !fief && pn && nt && person) add(`${dyn}${pn}${nt}${person}`);
 
   return strings;
 }

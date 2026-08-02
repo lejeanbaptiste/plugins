@@ -1,0 +1,310 @@
+{
+  "schemaVersion": 1,
+  "builtAt": "2026-08-02T13:09:36.315Z",
+  "plugins": [
+    {
+      "id": "cjk-dates",
+      "name": "East Asian dates",
+      "version": "0.1.0",
+      "description": "Tag and disambiguate premodern dates for China, Japan, and Korea using Sanmiao.",
+      "author": "Daniel Patrick Morgan",
+      "homepage": "https://github.com/lejeanbaptiste/plugins/tree/main/packages/plugin-cjk-dates",
+      "license": "GPL-2.0",
+      "languages": [
+        "zh-hant",
+        "zh-hans",
+        "lzh",
+        "ja",
+        "ko"
+      ],
+      "regions": [
+        "east-asia",
+        "china",
+        "japan",
+        "korea"
+      ],
+      "manifest": {
+        "manifestVersion": "1.0.0",
+        "id": "cjk-dates",
+        "name": "East Asian dates",
+        "version": "0.1.0",
+        "description": "Tag and disambiguate premodern dates for China, Japan, and Korea using Sanmiao.",
+        "author": "Daniel Patrick Morgan",
+        "homepage": "https://github.com/lejeanbaptiste/plugins/tree/main/packages/plugin-cjk-dates",
+        "license": "GPL-2.0",
+        "ljb": {
+          "minVersion": "0.1.0"
+        },
+        "languages": [
+          "zh-hant",
+          "zh-hans",
+          "lzh",
+          "ja",
+          "ko"
+        ],
+        "regions": [
+          "east-asia",
+          "china",
+          "japan",
+          "korea"
+        ],
+        "languagePrompt": {
+          "message": "Premodern East Asian date tagging is available as a plugin. Open Tools → Plugins to install “East Asian dates”.",
+          "documentLanguages": [
+            "zh-hant",
+            "zh-hans",
+            "lzh",
+            "ja",
+            "ko"
+          ]
+        },
+        "entry": {
+          "kind": "hybrid",
+          "module": "dist/register.mjs",
+          "python": {
+            "module": "sanmiao.tei_bridge",
+            "runtime": "bundled",
+            "runtimePath": "python"
+          }
+        },
+        "contributions": {
+          "toolsMenu": [
+            {
+              "id": "cjk-date-curator",
+              "label": "East Asian date curator…",
+              "action": "cjk-dates.open-curator",
+              "separatorBefore": true
+            }
+          ],
+          "autoTagging": [
+            {
+              "id": "cjk-dates-propose",
+              "label": "Propose dates (Sanmiao)",
+              "description": "Find era names, reign dates, sexagenary days, and relational dates in plain text spans.",
+              "kind": "dates",
+              "defaultEnabled": true,
+              "tags": [
+                "date"
+              ]
+            },
+            {
+              "id": "cjk-dates-disambiguate",
+              "label": "Disambiguate tagged dates",
+              "description": "Resolve dynasty, ruler, and calendar stream for tagged date elements.",
+              "kind": "custom",
+              "defaultEnabled": true,
+              "tags": [
+                "date"
+              ]
+            }
+          ],
+          "settingsSections": [
+            {
+              "id": "cjk-dates",
+              "label": "East Asian dates",
+              "description": "Default civilization, fuzzy matching, and sequential date interpretation."
+            }
+          ],
+          "disambiguation": [
+            {
+              "id": "cjk-dates-by-context",
+              "label": "Dates with dynasty and era context",
+              "entityKind": "date",
+              "description": "Use surrounding dynasty markers and document date range to narrow calendar interpretation."
+            }
+          ]
+        },
+        "bundled": [
+          "dist/register.mjs",
+          "src/register.ts",
+          "scripts/download-python-runtime.mjs",
+          "scripts/retryable-fetch.mjs",
+          "scripts/smoke-test.mjs",
+          "python"
+        ]
+      },
+      "fileName": "ljb-plugin-cjk-dates-0.1.0.tar.gz",
+      "bytes": 6192,
+      "sha256": "d0edbcc087c06beab3ffd4bf3cdc2b97296af45dad204109af9a9805244b4caf"
+    },
+    {
+      "id": "norbert",
+      "name": "Norbert",
+      "version": "0.1.0",
+      "description": "Premodern Chinese entity tagging with contextual person clues, noble titles, and the Norbert authority pack.",
+      "author": "Daniel Patrick Morgan",
+      "homepage": "https://github.com/lejeanbaptiste/plugins/tree/main/packages/plugin-norbert",
+      "license": "GPL-2.0",
+      "languages": [
+        "zh-hant",
+        "zh-hans",
+        "lzh"
+      ],
+      "regions": [
+        "east-asia",
+        "china"
+      ],
+      "manifest": {
+        "manifestVersion": "1.0.0",
+        "id": "norbert",
+        "name": "Norbert",
+        "version": "0.1.0",
+        "description": "Premodern Chinese entity tagging with contextual person clues, noble titles, and the Norbert authority pack.",
+        "author": "Daniel Patrick Morgan",
+        "homepage": "https://github.com/lejeanbaptiste/plugins/tree/main/packages/plugin-norbert",
+        "license": "GPL-2.0",
+        "ljb": {
+          "minVersion": "0.1.0"
+        },
+        "languages": [
+          "zh-hant",
+          "zh-hans",
+          "lzh"
+        ],
+        "regions": [
+          "east-asia",
+          "china"
+        ],
+        "languagePrompt": {
+          "message": "Norbert adds Chinese prosopography tools and an authority pack. Open Tools → Plugins to install it.",
+          "documentLanguages": [
+            "zh-hant",
+            "zh-hans",
+            "lzh"
+          ]
+        },
+        "entry": {
+          "kind": "hybrid",
+          "module": "dist/register.mjs",
+          "python": {
+            "module": "norbert.ljb_bridge",
+            "runtime": "bundled",
+            "runtimePath": "python"
+          }
+        },
+        "contributions": {
+          "toolsMenu": [
+            {
+              "id": "norbert-settings",
+              "label": "Norbert settings…",
+              "action": "norbert.open-settings",
+              "separatorBefore": true
+            }
+          ],
+          "autoTagging": [
+            {
+              "id": "norbert-authority-bomb",
+              "label": "Tag from Norbert authority pack",
+              "description": "Match person names from the compiled Norbert database.",
+              "kind": "authority-tag-bomb",
+              "defaultEnabled": true,
+              "tags": [
+                "persName"
+              ]
+            },
+            {
+              "id": "norbert-context-person",
+              "label": "Contextual person tagging",
+              "description": "Build compound match strings from dynasty, office, place, and name (Norbert person-wrapper logic).",
+              "kind": "contextual-disambiguation",
+              "defaultEnabled": true,
+              "tags": [
+                "persName",
+                "roleName",
+                "placeName"
+              ]
+            }
+          ],
+          "authorityPacks": [
+            {
+              "id": "norbert-persons",
+              "label": "Norbert persons",
+              "defaultTag": "persName",
+              "install": {
+                "source": "authoritypacks-release",
+                "releaseId": "authority-packs-chinese",
+                "manifestPath": "norbert/manifest.json"
+              }
+            },
+            {
+              "id": "norbert-person-wrappers",
+              "label": "Norbert person wrappers",
+              "defaultTag": "persName",
+              "install": {
+                "source": "authoritypacks-release",
+                "releaseId": "authority-packs-chinese",
+                "manifestPath": "norbert/manifest.json"
+              }
+            },
+            {
+              "id": "norbert-offices",
+              "label": "Norbert offices (官名)",
+              "defaultTag": "roleName",
+              "install": {
+                "source": "authoritypacks-release",
+                "releaseId": "authority-packs-chinese",
+                "manifestPath": "norbert/manifest.json"
+              }
+            },
+            {
+              "id": "norbert-wiki-nt",
+              "label": "Norbert + Wikipedia noble titles",
+              "defaultTag": "persName",
+              "install": {
+                "source": "bundled",
+                "path": "data/wiki-nt-links.ndjson"
+              }
+            }
+          ],
+          "settingsSections": [
+            {
+              "id": "norbert",
+              "label": "Norbert",
+              "description": "Contextual tagging rules, noble-title patterns, and authority pack options."
+            }
+          ],
+          "disambiguation": [
+            {
+              "id": "norbert-context-person",
+              "label": "Person by dynasty, office, and origin",
+              "entityKind": "person",
+              "description": "Disambiguate using concatenated context (e.g. 晉 + 秘書監 + 荀勗) before falling back to name-only matches.",
+              "usesContextKeys": [
+                "dynasty",
+                "office",
+                "place",
+                "nationality",
+                "compound-string"
+              ]
+            },
+            {
+              "id": "norbert-noble-title",
+              "label": "Noble title + given name",
+              "entityKind": "person",
+              "description": "Resolve abbreviated princely titles where only the given name appears in the surface text.",
+              "usesContextKeys": [
+                "office",
+                "place",
+                "compound-string"
+              ]
+            }
+          ]
+        },
+        "dependencies": {
+          "plugins": []
+        },
+        "bundled": [
+          "dist/register.mjs",
+          "data/surnames.json",
+          "data/geo-admin-suffixes.json",
+          "data/wiki-nt-links.ndjson",
+          "data/wiki-nt-links.json",
+          "python"
+        ]
+      },
+      "fileName": "ljb-plugin-norbert-0.1.0.tar.gz",
+      "bytes": 568466,
+      "sha256": "505ecf8c9f700a24f7041ce7c8458720bda263e43eac54bf1e11afc429c45634"
+    }
+  ]
+}

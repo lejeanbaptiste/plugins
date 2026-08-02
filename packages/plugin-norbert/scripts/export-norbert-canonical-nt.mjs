@@ -55,15 +55,20 @@ if (!fs.existsSync(personsPath)) {
 const outNdjson = path.resolve(__dirname, '../data/wiki-nt-links.ndjson');
 const outJson = path.resolve(__dirname, '../data/wiki-nt-links.json');
 
-// --- person_id -> canonical name, from the already-compiled Norbert persons pack ---
+// --- person_id -> asserted primary persName, from the compiled Norbert persons pack ---
 /** @type {Map<string, string>} */
 const personNameById = new Map();
+/** @type {Map<string, string>} */
+const personDisplayNameById = new Map();
 for (const line of fs.readFileSync(personsPath, 'utf8').split('\n')) {
   if (!line.trim()) continue;
   const row = JSON.parse(line);
-  if (row.authorityId && row.primaryName) personNameById.set(String(row.authorityId), row.primaryName);
+  const displayName = row.displayName ?? row.primaryName;
+  if (row.authorityId && displayName) personDisplayNameById.set(String(row.authorityId), displayName);
+  const primaryPersName = row.names?.find((name) => name.type === 'primary')?.text;
+  if (row.authorityId && primaryPersName) personNameById.set(String(row.authorityId), primaryPersName);
 }
-console.log(`loaded ${personNameById.size} Norbert person names`);
+console.log(`loaded ${personNameById.size} Norbert personal names and ${personDisplayNameById.size} display names`);
 
 // --- person_nt, straight from the private SQL dump ---
 const NT_COL = {
@@ -102,6 +107,7 @@ const coveredKeys = coveredKeysFromExistingAsset(base);
 const canonicalRecords = buildCanonicalNtRecords({
   ntRows,
   personNameById,
+  personDisplayNameById,
   coveredKeys,
   startIndex: base.length,
 });

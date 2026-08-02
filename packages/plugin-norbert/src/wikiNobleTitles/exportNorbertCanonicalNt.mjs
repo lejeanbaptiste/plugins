@@ -11,11 +11,12 @@ import { buildMatchKey, buildNtSearchStrings } from './compileWikiNtAsset.mjs';
  * @param {{
  *   ntRows: Array<{ ind: number, personId: number, dyn: string|null, fief: string|null, pn: string|null, nt: string|null, dynId: number|null, startYear: number|null, endYear: number|null }>,
  *   personNameById: Map<string, string>,
+ *   personDisplayNameById?: Map<string, string>,
  *   coveredKeys: Set<string>,
  *   startIndex: number,
  * }} params
  */
-export function buildCanonicalNtRecords({ ntRows, personNameById, coveredKeys, startIndex }) {
+export function buildCanonicalNtRecords({ ntRows, personNameById, personDisplayNameById = new Map(), coveredKeys, startIndex }) {
   /** @type {Record<string, unknown>[]} */
   const records = [];
   let index = startIndex;
@@ -23,14 +24,21 @@ export function buildCanonicalNtRecords({ ntRows, personNameById, coveredKeys, s
   for (const row of ntRows) {
     const key = `${row.personId}:${row.ind}`;
     if (coveredKeys.has(key)) continue;
-    if (!row.fief || !row.nt) continue; // matches planToAssetRecord's "no recoverable title" skip
+    if (!row.nt) continue;
 
     const person = personNameById.get(String(row.personId)) ?? null;
+    const displayName = personDisplayNameById.get(String(row.personId)) ?? person;
+    let roleName = row.nt;
+    let posthumousName = row.pn;
+    if (!row.fief && !posthumousName && displayName && row.nt === '后' && displayName.endsWith('皇后')) {
+      roleName = '皇后';
+      posthumousName = displayName.slice(0, -roleName.length) || null;
+    }
     const searchStrings = buildNtSearchStrings({
       dyn: row.dyn,
       fief: row.fief,
-      pn: row.pn,
-      nt: row.nt,
+      pn: posthumousName,
+      nt: roleName,
       person,
     });
     if (searchStrings.length === 0) continue;
@@ -49,8 +57,8 @@ export function buildCanonicalNtRecords({ ntRows, personNameById, coveredKeys, s
           titleRowId: id,
           components: {
             fief: row.fief,
-            roleName: row.nt,
-            posthumousName: row.pn ?? undefined,
+            roleName,
+            posthumousName: posthumousName ?? undefined,
             persName: person,
           },
         }
@@ -61,9 +69,9 @@ export function buildCanonicalNtRecords({ ntRows, personNameById, coveredKeys, s
       source: 'norbert-direct',
       authorityId: `wiki-nt:${String(index).padStart(4, '0')}`,
       kind: 'person',
-      primaryName: person || [row.fief, row.pn, row.nt].filter(Boolean).join(''),
+      primaryName: person || [row.fief, posthumousName, roleName].filter(Boolean).join(''),
       action: 'norbert_canonical',
-      matchKey: buildMatchKey({ dyn: row.dyn, fief: row.fief, pn: row.pn, nt: row.nt, person }),
+      matchKey: buildMatchKey({ dyn: row.dyn, fief: row.fief, pn: posthumousName, nt: roleName, person }),
       searchStrings,
       names: person ? [{ text: person, type: 'wrapper-person' }] : [],
       wiki: null,
@@ -73,8 +81,8 @@ export function buildCanonicalNtRecords({ ntRows, personNameById, coveredKeys, s
         canName: person,
         dyn: row.dyn,
         fief: row.fief,
-        pn: row.pn,
-        nt: row.nt,
+        pn: posthumousName,
+        nt: roleName,
         dynId: row.dynId ?? null,
         startYear: row.startYear ?? null,
         endYear: row.endYear ?? null,
@@ -93,8 +101,8 @@ export function buildCanonicalNtRecords({ ntRows, personNameById, coveredKeys, s
         titleSearchStrings,
         nobleTitle: {
           fief: row.fief,
-          roleName: row.nt,
-          posthumousName: row.pn ?? undefined,
+          roleName,
+          posthumousName: posthumousName ?? undefined,
         },
       },
     });

@@ -38,17 +38,25 @@ test('skips rows already covered by a wiki-matched record', () => {
   assert.equal(records.length, 0);
 });
 
-test('skips rows with no fief or no title rank — nothing searchable to emit', () => {
+test('emits a no-fief empress title with its complete posthumous title', () => {
   const records = buildCanonicalNtRecords({
     ntRows: [
-      { ind: 1, personId: 1, dyn: '漢', fief: null, pn: '恭', nt: '王', dynId: 1, startYear: null, endYear: null },
+      { ind: 1, personId: 9547, dyn: null, fief: null, pn: null, nt: '后', dynId: null, startYear: null, endYear: null },
       { ind: 2, personId: 2, dyn: '漢', fief: '東海', pn: null, nt: null, dynId: 1, startYear: null, endYear: null },
     ],
     personNameById: new Map(),
+    personDisplayNameById: new Map([['9547', '孝元皇后']]),
     coveredKeys: new Set(),
     startIndex: 0,
   });
-  assert.equal(records.length, 0);
+  assert.equal(records.length, 1);
+  assert.deepEqual(records[0].searchStrings, ['孝元皇后']);
+  assert.equal(records[0].metadata.wrapper, undefined);
+  assert.deepEqual(records[0].metadata.nobleTitle, {
+    fief: null,
+    roleName: '皇后',
+    posthumousName: '孝元',
+  });
 });
 
 test('a person with no name in the persons pack still emits a title-only record', () => {
