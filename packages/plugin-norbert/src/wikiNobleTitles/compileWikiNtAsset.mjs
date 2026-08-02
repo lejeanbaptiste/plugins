@@ -9,10 +9,10 @@ import {
 export { mergeCorrections, resolveApplyAction, buildApplyPlan };
 
 /**
- * @param {{ dyn?: string|null, fief?: string|null, pn?: string|null, nt?: string|null, person?: string|null }} parts
+ * @param {{ dyn?: string|null, fief?: string|null, pn?: string|null, pnAbr?: string|null, nt?: string|null, person?: string|null }} parts
  */
 export function buildNtSearchStrings(parts) {
-  const { dyn, fief, pn, nt, person } = parts;
+  const { dyn, fief, pn, pnAbr, nt, person } = parts;
   /** @type {string[]} */
   const strings = [];
   const add = (s) => {
@@ -25,6 +25,10 @@ export function buildNtSearchStrings(parts) {
   if (fief && nt && person) add(`${fief}${nt}${person}`);
   if (!fief && pn && nt) add(`${pn}${nt}`);
   if (!fief && pn && nt && person) add(`${pn}${nt}${person}`);
+  if (fief && pnAbr && nt) add(`${fief}${pnAbr}${nt}`);
+  if (fief && pnAbr && nt && person) add(`${fief}${pnAbr}${nt}${person}`);
+  if (!fief && pnAbr && nt) add(`${pnAbr}${nt}`);
+  if (!fief && pnAbr && nt && person) add(`${pnAbr}${nt}${person}`);
   // Skip the dyn-prefixed variants when dyn === fief (e.g. Liu Bei's 漢昭烈帝,
   // where Norbert records both dyn and fief as "漢") — they'd otherwise
   // duplicate into a garbled "漢漢昭烈帝".
@@ -32,6 +36,10 @@ export function buildNtSearchStrings(parts) {
   if (dyn && fief && dyn !== fief && pn && nt && person) add(`${dyn}${fief}${pn}${nt}${person}`);
   if (dyn && !fief && pn && nt) add(`${dyn}${pn}${nt}`);
   if (dyn && !fief && pn && nt && person) add(`${dyn}${pn}${nt}${person}`);
+  if (dyn && fief && dyn !== fief && pnAbr && nt) add(`${dyn}${fief}${pnAbr}${nt}`);
+  if (dyn && fief && dyn !== fief && pnAbr && nt && person) add(`${dyn}${fief}${pnAbr}${nt}${person}`);
+  if (dyn && !fief && pnAbr && nt) add(`${dyn}${pnAbr}${nt}`);
+  if (dyn && !fief && pnAbr && nt && person) add(`${dyn}${pnAbr}${nt}${person}`);
 
   return strings;
 }

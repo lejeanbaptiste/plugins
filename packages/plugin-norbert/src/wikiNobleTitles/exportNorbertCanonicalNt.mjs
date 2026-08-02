@@ -9,7 +9,7 @@ import { buildMatchKey, buildNtSearchStrings } from './compileWikiNtAsset.mjs';
  * Wikipedia-matched `norbert-wikipedia` rows compiled elsewhere in this file.
  *
  * @param {{
- *   ntRows: Array<{ ind: number, personId: number, dyn: string|null, fief: string|null, pn: string|null, nt: string|null, dynId: number|null, startYear: number|null, endYear: number|null }>,
+ *   ntRows: Array<{ ind: number, personId: number, dyn: string|null, fief: string|null, pn: string|null, pnAbr: string|null, nt: string|null, dynId: number|null, startYear: number|null, endYear: number|null }>,
  *   personNameById: Map<string, string>,
  *   personDisplayNameById?: Map<string, string>,
  *   coveredKeys: Set<string>,
@@ -38,6 +38,7 @@ export function buildCanonicalNtRecords({ ntRows, personNameById, personDisplayN
       dyn: row.dyn,
       fief: row.fief,
       pn: posthumousName,
+      pnAbr: row.pnAbr,
       nt: roleName,
       person,
     });
@@ -59,6 +60,7 @@ export function buildCanonicalNtRecords({ ntRows, personNameById, personDisplayN
             fief: row.fief,
             roleName,
             posthumousName: posthumousName ?? undefined,
+            ...(row.pnAbr ? { posthumousNameAbbr: row.pnAbr } : {}),
             persName: person,
           },
         }
@@ -82,6 +84,7 @@ export function buildCanonicalNtRecords({ ntRows, personNameById, personDisplayN
         dyn: row.dyn,
         fief: row.fief,
         pn: posthumousName,
+        pnAbr: row.pnAbr ?? null,
         nt: roleName,
         dynId: row.dynId ?? null,
         startYear: row.startYear ?? null,
@@ -103,6 +106,7 @@ export function buildCanonicalNtRecords({ ntRows, personNameById, personDisplayN
           fief: row.fief,
           roleName,
           posthumousName: posthumousName ?? undefined,
+          ...(row.pnAbr ? { posthumousNameAbbr: row.pnAbr } : {}),
         },
       },
     });

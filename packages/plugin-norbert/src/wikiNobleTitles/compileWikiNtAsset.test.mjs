@@ -14,6 +14,13 @@ test('buildNtSearchStrings composes title variants', () => {
   assert.ok(strings.includes('東海恭王劉彊'));
 });
 
+test('buildNtSearchStrings adds the explicit Norbert abbreviation only when supplied', () => {
+  const withAbbreviation = buildNtSearchStrings({ fief: '宋', pn: '孝武', pnAbr: '武', nt: '帝' });
+  const withoutAbbreviation = buildNtSearchStrings({ fief: '宋', pn: '孝武', nt: '帝' });
+  assert.ok(withAbbreviation.includes('宋武帝'));
+  assert.ok(!withoutAbbreviation.includes('宋武帝'));
+});
+
 test('planToAssetRecord includes norbert ids without sql', () => {
   const plan = buildApplyPlan(
     {
