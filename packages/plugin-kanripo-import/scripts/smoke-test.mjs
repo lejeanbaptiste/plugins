@@ -87,7 +87,12 @@ log('register() wiring OK');
 log('checking register source…');
 assert.match(fs.readFileSync(registerSourcePath, 'utf8'), /kanripo-import-ui/);
 assert.ok(fs.existsSync(worksPath), 'data/krp_works.json missing');
-assert.ok(fs.existsSync(bridgePath), 'python bridge missing');
+log('checking python parallel punct…');
+execFileSync('python', ['-m', 'pytest', 'python/tests/test_parallel_punct.py', '-q'], {
+  cwd: packageRoot,
+  env: { ...process.env, PYTHONPATH: path.join(packageRoot, 'python') },
+  stdio: 'inherit',
+});
 const { size } = fs.statSync(registerPath);
 assert.ok(size > 200 && size < 20_000, `unexpected register size ${size}`);
 log('ALL PASS');

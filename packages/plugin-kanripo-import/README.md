@@ -2,7 +2,7 @@
 
 Clone a [Kanseki Repository](https://github.com/kanripo) work and convert each juan to project TEI.
 
-Conversion lives in `normalization_zh.kanripo_tei` (not `segment_kanripo_document`, which strips page breaks for reuse matching).
+Conversion lives in `normalization_zh.kanripo_tei` (not `segment_kanripo_document`, which strips page breaks for reuse matching). Parallel punctuation (several files/pastes, overlap only) lives in this plugin: `kanripo_import.parallel_punct`.
 
 ## Build
 
@@ -27,4 +27,5 @@ npm run smoke:kanripo-import
 | Manifest, work index, Python bridge | This package |
 | Thin `dist/register.mjs` | This package |
 | Wizard UI | LJB host module `plugins/hostModules/kanripoImportUi.ts` |
-| Mandoku → TEI body | `normalization_zh.kanripo_tei` |
+| Mandoku → TEI body | `normalization_zh.kanripo_tei` (to be vendored) |
+| Parallel punctuate | `python/kanripo_import/parallel_punct.py` |

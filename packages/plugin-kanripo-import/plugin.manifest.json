@@ -32,6 +32,13 @@
         "label": "Import from Kanripo…",
         "action": "kanripo-import.open"
       }
+    ],
+    "toolsMenu": [
+      {
+        "id": "punctuate-kanripo",
+        "label": "Segment and punctuate…",
+        "action": "kanripo-import.punctuate"
+      }
     ]
   },
   "bundled": [
