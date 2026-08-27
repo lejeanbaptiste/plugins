@@ -10,10 +10,15 @@ const packageRoot = path.join(__dirname, '..');
 const manifestPath = path.join(packageRoot, 'plugin.manifest.json');
 const registerPath = path.join(packageRoot, 'dist/register.mjs');
 const registerSourcePath = path.join(packageRoot, 'src/register.ts');
-const hostUiPath = path.resolve(
-  packageRoot,
-  '../../../lejeanbaptiste/packages/cwrc-leafwriter/src/plugins/hostModules/kanripoImportUi.ts',
-);
+const hostUiRel = 'packages/cwrc-leafwriter/src/plugins/hostModules/kanripoImportUi.ts';
+const hostUiPath = [
+  process.env.LJB_HOST_ROOT,
+  path.resolve(packageRoot, '../../../lejeanbaptiste'),
+  path.resolve(packageRoot, '../../../leaf-writer'),
+]
+  .filter(Boolean)
+  .map((root) => path.join(root, hostUiRel))
+  .find((candidate) => fs.existsSync(candidate));
 const worksPath = path.join(packageRoot, 'data/krp_works.json');
 const bridgePath = path.join(packageRoot, 'python/kanripo_import/ljb_bridge.py');
 
@@ -42,7 +47,10 @@ if (!fs.existsSync(registerPath)) {
 }
 
 log('checking host UI module wiring…');
-assert.ok(fs.existsSync(hostUiPath), `host UI module missing: ${hostUiPath}`);
+assert.ok(
+  hostUiPath,
+  'host UI module missing (looked for sibling lejeanbaptiste/ or leaf-writer/, or LJB_HOST_ROOT)',
+);
 const hostUiSource = fs.readFileSync(hostUiPath, 'utf8');
 assert.match(hostUiSource, /registerKanripoImportUi/, 'host module must export registerKanripoImportUi');
 log('host UI module OK');
