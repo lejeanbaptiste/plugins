@@ -167,7 +167,7 @@ export function validatePluginManifest(manifest) {
  */
 function validateContributions(contributions, errors) {
   errors.push(...rejectUnknownKeys(contributions, [
-    'toolsMenu', 'autoTagging', 'authorityPacks', 'settingsSections', 'disambiguation',
+    'toolsMenu', 'fileMenu', 'autoTagging', 'authorityPacks', 'settingsSections', 'disambiguation',
   ], 'contributions'));
 
   if (contributions.toolsMenu != null) {
@@ -175,6 +175,15 @@ function validateContributions(contributions, errors) {
     else {
       for (const [i, item] of contributions.toolsMenu.entries()) {
         validateToolsMenuItem(item, `contributions.toolsMenu[${i}]`, errors);
+      }
+    }
+  }
+
+  if (contributions.fileMenu != null) {
+    if (!Array.isArray(contributions.fileMenu)) errors.push('contributions.fileMenu must be an array');
+    else {
+      for (const [i, item] of contributions.fileMenu.entries()) {
+        validateToolsMenuItem(item, `contributions.fileMenu[${i}]`, errors);
       }
     }
   }

@@ -79,6 +79,7 @@
 /**
  * @typedef {Object} PluginContributions
  * @property {PluginToolsMenuItem[]} [toolsMenu]
+ * @property {PluginToolsMenuItem[]} [fileMenu]
  * @property {PluginAutoTaggingProducer[]} [autoTagging]
  * @property {PluginAuthorityPackContribution[]} [authorityPacks]
  * @property {PluginSettingsSection[]} [settingsSections]

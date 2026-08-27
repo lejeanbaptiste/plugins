@@ -134,6 +134,10 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
+        "fileMenu": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/toolsMenuItem" }
+        },
         "toolsMenu": {
           "type": "array",
           "items": { "$ref": "#/$defs/toolsMenuItem" }
