@@ -16,11 +16,18 @@ PUNCT_CHARS = set("。，、：；？！「」『』（）〔〕.,;:!?")
 SEG_ANA = "ljb:parallel-punct"
 SEG_OPEN = f'<seg ana="{SEG_ANA}">'
 NOTE_RE = re.compile(r"<note\b[^>]*>.*?</note>", re.DOTALL)
+NOTE_OPEN_COMM_RE = re.compile(r'<note\b[^>]*\btype="comm"[^>]*>', re.I)
+NOTE_CLOSE_RE = re.compile(r"</note>")
+SPLIT_COMM_RE = re.compile(r"</note></p><p><note\b[^>]*\btype=\"comm\"[^>]*>", re.I)
+INLINE_COMM_RE = re.compile(r'<span\b[^>]*\bclass="inlinecomment"[^>]*>(.*?)</span>', re.DOTALL | re.I)
+WIKISOURCE_COMM_RE = re.compile(r"〈[^〉]*〉")
 PB_RE = re.compile(r"<pb\b[^>]*/>")
 TAG_RE = re.compile(r"</?[A-Za-z][^>]*>")
 SEG_OPEN_RE = re.compile(r'<seg\b[^>]*\bana="[^"]*\bljb:parallel-punct[^"]*"[^>]*>')
 MIN_BLOCK = 8
 MIN_STICKER_COVER = 0.8
+MAX_TAPE_GAP = 20
+SENTENCE_END_PUNCT = frozenset("。！？")
 
 
 class CoverageSpan(TypedDict):
@@ -45,6 +52,17 @@ class ParallelPunctResult(TypedDict):
     body_xml: str
     coverage: Coverage
     applied: bool
+
+
+class BodySegment(TypedDict):
+    kind: str
+    atom_indices: list[int]
+    han: str
+
+
+class RefSegment(TypedDict):
+    kind: str
+    text: str
 
 
 def han_only(text: str) -> str:
@@ -96,6 +114,50 @@ def _coverage_from_intervals(
     }
 
 
+def merge_split_comm_notes(body_xml: str) -> str:
+    """Join commentary notes split across ``</p><p>`` (no breaks inside interlinear comm)."""
+    return SPLIT_COMM_RE.sub("", body_xml)
+
+
+def strip_wikisource_commentary(parallel_text: str) -> str:
+    """Drop Wikisource interlinear notes in corner brackets for main-text matching."""
+    return WIKISOURCE_COMM_RE.sub("", parallel_text)
+
+
+def _merged_tape_span(blocks: list, tape_len: int) -> tuple[int, int, int] | None:
+    """Merge nearby match blocks on the tape axis; return best (start, end, matched_chars)."""
+    if not blocks:
+        return None
+    ordered = sorted(blocks, key=lambda block: block.b)
+    spans: list[tuple[int, int, int]] = []
+    start = ordered[0].b
+    end = ordered[0].b + ordered[0].size
+    matched = ordered[0].size
+    for block in ordered[1:]:
+        gap = block.b - end
+        if gap <= MAX_TAPE_GAP:
+            end = max(end, block.b + block.size)
+            matched += block.size
+            continue
+        spans.append((start, end, matched))
+        start = block.b
+        end = block.b + block.size
+        matched = block.size
+    spans.append((start, end, matched))
+    return max(spans, key=lambda item: item[2])
+
+
+def find_han_overlap_from(tape: str, sticker: str, start: int = 0) -> tuple[int, int] | None:
+    """Like ``find_han_overlap`` but search ``tape[start:]`` and return absolute indices."""
+    if start < 0 or start >= len(tape):
+        return None
+    overlap = find_han_overlap(tape[start:], sticker)
+    if overlap is None:
+        return None
+    rel_start, rel_end = overlap
+    return start + rel_start, start + rel_end
+
+
 def find_han_overlap(tape: str, sticker: str) -> tuple[int, int] | None:
     """Return ``(tape_start, tape_end)`` han indices, or None."""
     if not tape or not sticker:
@@ -105,24 +167,84 @@ def find_han_overlap(tape: str, sticker: str) -> tuple[int, int] | None:
         if exact >= 0:
             return exact, exact + len(sticker)
         matcher = SequenceMatcher(a=tape, b=sticker, autojunk=False)
-        blocks = [block for block in matcher.get_matching_blocks() if block.size >= MIN_BLOCK]
-        if not blocks:
+        all_blocks = [block for block in matcher.get_matching_blocks() if block.size > 0]
+        if not all_blocks:
             return None
-        best = max(blocks, key=lambda block: block.size)
-        if best.size / len(sticker) < MIN_STICKER_COVER:
-            return None
-        return best.a, best.a + best.size
+        blocks = [block for block in all_blocks if block.size >= MIN_BLOCK]
+        if blocks:
+            best = max(blocks, key=lambda block: block.size)
+            if best.size / len(sticker) >= MIN_STICKER_COVER:
+                return best.a, best.a + best.size
+        sticker_intervals = [(block.b, block.b + block.size) for block in all_blocks]
+        if _union_covered(sticker_intervals) / len(sticker) >= MIN_STICKER_COVER:
+            tape_intervals = [(block.a, block.a + block.size) for block in all_blocks]
+            return min(item[0] for item in tape_intervals), max(item[1] for item in tape_intervals)
+        return None
     exact = sticker.find(tape)
     if exact >= 0:
         return 0, len(tape)
     matcher = SequenceMatcher(a=sticker, b=tape, autojunk=False)
-    blocks = [block for block in matcher.get_matching_blocks() if block.size >= MIN_BLOCK]
+    all_blocks = [block for block in matcher.get_matching_blocks() if block.size > 0]
+    blocks = [block for block in all_blocks if block.size >= MIN_BLOCK]
     if not blocks:
+        blocks = [block for block in all_blocks if block.size >= 6]
+    if not all_blocks:
         return None
-    best = max(blocks, key=lambda block: block.size)
-    if best.size / len(tape) < MIN_STICKER_COVER:
-        return None
-    return best.b, best.b + best.size
+    merged = _merged_tape_span(blocks, len(tape)) if blocks else None
+    if merged is not None:
+        tape_start, tape_end, matched = merged
+        if matched / len(tape) >= MIN_STICKER_COVER:
+            return tape_start, tape_end
+    intervals = [(block.b, block.b + block.size) for block in all_blocks]
+    covered = _union_covered(intervals)
+    if covered / len(tape) >= MIN_STICKER_COVER:
+        return min(item[0] for item in intervals), max(item[1] for item in intervals)
+    return None
+
+
+def _append_xml_atom(xml: str, i: int, atoms: list[str]) -> int:
+    if xml.startswith("<", i):
+        pb = PB_RE.match(xml, i)
+        if pb:
+            atoms.append(pb.group(0))
+            return pb.end()
+        tag = TAG_RE.match(xml, i)
+        if tag:
+            atoms.append(tag.group(0))
+            return tag.end()
+    atoms.append(xml[i])
+    return i + 1
+
+
+def _iter_xml_atoms_segmented(xml: str) -> list[str]:
+    """Like ``_iter_xml_atoms`` but expand ``<note type="comm">`` innards for segment Han."""
+    atoms: list[str] = []
+    i = 0
+    n = len(xml)
+    while i < n:
+        if xml.startswith("<", i):
+            comm_open = NOTE_OPEN_COMM_RE.match(xml, i)
+            if comm_open:
+                atoms.append(comm_open.group(0))
+                i = comm_open.end()
+                while i < n:
+                    close = NOTE_CLOSE_RE.match(xml, i)
+                    if close:
+                        atoms.append(close.group(0))
+                        i = close.end()
+                        break
+                    i = _append_xml_atom(xml, i, atoms)
+                continue
+            note = NOTE_RE.match(xml, i)
+            if note:
+                atoms.append(note.group(0))
+                i = note.end()
+                continue
+            i = _append_xml_atom(xml, i, atoms)
+            continue
+        atoms.append(xml[i])
+        i += 1
+    return atoms
 
 
 def _iter_xml_atoms(xml: str) -> list[str]:
@@ -183,6 +305,566 @@ def _han_tape(atoms: list[str]) -> tuple[str, list[int]]:
     return tape, han_atom_index
 
 
+def _atoms_han(atoms: list[str], indices: list[int]) -> str:
+    return "".join(atom for idx in indices for atom in [atoms[idx]] if HAN_RE.fullmatch(atom))
+
+
+def parse_body_segments(body_xml: str) -> list[BodySegment]:
+    """Alternating basetext / commentary runs in document order."""
+    atoms = _iter_xml_atoms_segmented(body_xml)
+    segments: list[BodySegment] = []
+    kind = "text"
+    indices: list[int] = []
+    in_comm = False
+
+    def flush() -> None:
+        nonlocal indices, kind
+        if not indices:
+            return
+        han = _atoms_han(atoms, indices)
+        if han:
+            segments.append({"kind": kind, "atom_indices": indices.copy(), "han": han})
+        indices = []
+
+    for idx, atom in enumerate(atoms):
+        if NOTE_OPEN_COMM_RE.fullmatch(atom):
+            flush()
+            kind = "comm"
+            in_comm = True
+            indices = [idx]
+            continue
+        if atom == "</note>" and in_comm:
+            indices.append(idx)
+            flush()
+            in_comm = False
+            kind = "text"
+            continue
+        indices.append(idx)
+    flush()
+    return segments
+
+
+def _parse_paren_reference_segments(text: str) -> list[RefSegment]:
+    segments: list[RefSegment] = []
+    buf: list[str] = []
+    in_comm = False
+    square = 0
+    comm_buf: list[str] = []
+
+    def flush_text() -> None:
+        chunk = "".join(buf)
+        if chunk.strip():
+            segments.append({"kind": "text", "text": chunk})
+        buf.clear()
+
+    for ch in text:
+        if in_comm:
+            if ch == "[":
+                square += 1
+                comm_buf.append(ch)
+                continue
+            if ch == "]" and square:
+                square -= 1
+                comm_buf.append(ch)
+                continue
+            if ch == ")" and square == 0:
+                segments.append({"kind": "comm", "text": "".join(comm_buf)})
+                comm_buf.clear()
+                in_comm = False
+                continue
+            comm_buf.append(ch)
+            continue
+        if ch == "(" and square == 0:
+            flush_text()
+            in_comm = True
+            continue
+        buf.append(ch)
+    flush_text()
+    if comm_buf:
+        segments.append({"kind": "comm", "text": "".join(comm_buf)})
+    return segments
+
+
+def parse_reference_segments(parallel_text: str) -> list[RefSegment]:
+    """Split ctext-style inline commentary or Kanripo ``(…)`` runs."""
+    if INLINE_COMM_RE.search(parallel_text):
+        segments: list[RefSegment] = []
+        pos = 0
+        for match in INLINE_COMM_RE.finditer(parallel_text):
+            if match.start() > pos:
+                segments.append({"kind": "text", "text": parallel_text[pos : match.start()]})
+            segments.append({"kind": "comm", "text": match.group(1)})
+            pos = match.end()
+        if pos < len(parallel_text):
+            segments.append({"kind": "text", "text": parallel_text[pos:]})
+        return [seg for seg in segments if seg["text"].strip() or han_only(seg["text"])]
+    return _parse_paren_reference_segments(parallel_text)
+
+
+def _sticker_to_tape_map(sticker_han: str, tape: str, tape_start: int, tape_end: int) -> dict[int, int]:
+    """Map sticker han index → local index in ``tape[tape_start:tape_end]`` for equal chars."""
+    sub = tape[tape_start:tape_end]
+    if not sticker_han or not sub:
+        return {}
+    mapping: dict[int, int] = {}
+    matcher = SequenceMatcher(a=sticker_han, b=sub, autojunk=False)
+    for op, a0, a1, b0, b1 in matcher.get_opcodes():
+        if op != "equal":
+            continue
+        for offset in range(a1 - a0):
+            mapping[a0 + offset] = b0 + offset
+    return mapping
+
+
+def _collect_insertions(
+    parallel_text: str,
+    tape: str,
+    tape_start: int,
+    tape_end: int,
+    sticker_han: str,
+    *,
+    split_sentences: bool = True,
+) -> tuple[dict[int, str], set[int]]:
+    insertions: dict[int, str] = {}
+    para_after: set[int] = set()
+    sticker_to_sub = _sticker_to_tape_map(sticker_han, tape, tape_start, tape_end)
+    span = tape_end - tape_start
+    han_in_sticker = 0
+    pending_nl = 0
+    for char in parallel_text.replace("\r\n", "\n").replace("\r", "\n"):
+        if HAN_RE.fullmatch(char):
+            if pending_nl >= 2:
+                local = sticker_to_sub.get(han_in_sticker - 1)
+                if local is not None and 0 <= local < span:
+                    para_after.add(tape_start + local)
+            pending_nl = 0
+            han_in_sticker += 1
+            continue
+        if char == "\n":
+            pending_nl += 1
+            continue
+        pending_nl = 0
+        if char in PUNCT_CHARS:
+            local = sticker_to_sub.get(han_in_sticker - 1)
+            if local is not None and 0 <= local < span:
+                at = tape_start + local
+                insertions[at] = insertions.get(at, "") + char
+                if split_sentences and char in SENTENCE_END_PUNCT:
+                    para_after.add(at)
+    return insertions, para_after
+
+
+def _comm_note_atom(atom: str) -> bool:
+    return atom.startswith("<note") and 'type="comm"' in atom
+
+
+def _comm_note_follows(atoms: list[str], index: int) -> bool:
+    """True when a comm note immediately follows this atom (ignoring whitespace)."""
+    cursor = index + 1
+    while cursor < len(atoms):
+        atom = atoms[cursor]
+        if atom in ("\n", "\r"):
+            cursor += 1
+            continue
+        if _comm_note_atom(atom):
+            return True
+        if atom == "</p>" or _is_p_open(atom):
+            return False
+        if atom.startswith("<"):
+            cursor += 1
+            continue
+        return False
+    return False
+
+
+def _ends_with_sentence_end(prefix: str) -> bool:
+    """Whether the last paragraph in ``prefix`` ends a sentence (or stamped stretch)."""
+    trimmed = prefix.rstrip()
+    if trimmed.endswith("</seg></p>") or trimmed.endswith("</seg>"):
+        return True
+    start = trimmed.rfind("<p>")
+    if start < 0:
+        return False
+    tail = trimmed[start + 3 :]
+    visible = re.sub(r"<[^>]+>", "", tail).strip()
+    return bool(visible) and visible[-1] in SENTENCE_END_PUNCT
+
+
+def relocate_leading_comm_notes(xml: str) -> str:
+    """Attach comm notes stranded at a ``<p>`` start to the preceding sentence."""
+    pattern = re.compile(
+        r"</p>\s*<p>\s*(<note\b[^>]*\btype=\"comm\"[^>]*>.*?</note>)",
+        re.DOTALL | re.I,
+    )
+    pos = 0
+    while True:
+        match = pattern.search(xml, pos)
+        if match is None:
+            return xml
+        before = xml[: match.start()]
+        if not _ends_with_sentence_end(before):
+            pos = match.end()
+            continue
+        note = match.group(1)
+        after = xml[match.end() :]
+        close_idx = before.rfind("</p>")
+        if close_idx < 0:
+            pos = match.end()
+            continue
+        xml = before[:close_idx] + note + before[close_idx:] + "<p>" + after
+        pos = close_idx + len(note) + 3
+
+
+def _is_p_open(atom: str) -> bool:
+    return atom == "<p>" or (atom.startswith("<p ") and atom.endswith(">"))
+
+
+def _paragraph_open_index(atoms: list[str], index: int) -> int | None:
+    cursor = index + 1
+    while cursor < len(atoms) and atoms[cursor] in ("\n", "\r"):
+        cursor += 1
+    if cursor < len(atoms) and _is_p_open(atoms[cursor]):
+        return cursor
+    return None
+
+
+def _should_skip_line_paragraph_break(
+    atom: str,
+    atoms: list[str],
+    index: int,
+    han_seen: int,
+    reflow_start: int,
+    reflow_end: int,
+    para_after: set[int],
+) -> bool:
+    """Drop Kanripo ``</p><p>`` wraps inside a reflow zone unless parallel marks a break."""
+    if atom != "</p>":
+        return False
+    if han_seen < reflow_start or han_seen >= reflow_end:
+        return False
+    if han_seen in para_after:
+        return False
+    return _paragraph_open_index(atoms, index) is not None
+
+
+def _emit_paragraph_split(
+    out: list[str],
+    opened_here: int,
+    stamp_depth: int,
+    atoms: list[str],
+    index: int,
+) -> tuple[int, int]:
+    """Insert ``</p><p>`` unless the source already breaks here."""
+    cursor = index + 1
+    while cursor < len(atoms) and atoms[cursor] in ("\n", "\r"):
+        cursor += 1
+    if cursor < len(atoms) and atoms[cursor] == "</p>":
+        return opened_here, stamp_depth
+    if opened_here > 0:
+        opened_here, stamp_depth = _close_stamp_if_open(out, opened_here, stamp_depth)
+    out.append("</p><p>")
+    return opened_here, stamp_depth
+
+
+def _skip_natural_break_after_split(atoms: list[str], index: int) -> int:
+    """Skip source ``</p><p>`` that duplicates a split we just inserted."""
+    cursor = index + 1
+    while cursor < len(atoms) and atoms[cursor] in ("\n", "\r"):
+        cursor += 1
+    if cursor < len(atoms) and atoms[cursor] == "</p>":
+        p_open = _paragraph_open_index(atoms, cursor)
+        if p_open is not None:
+            return p_open
+    return index
+
+
+def _close_stamp_if_open(out: list[str], opened_here: int, stamp_depth: int) -> tuple[int, int]:
+    if opened_here > 0:
+        out.append("</seg>")
+        return opened_here - 1, max(0, stamp_depth - 1)
+    return opened_here, stamp_depth
+
+
+def _open_stamp_if_needed(
+    out: list[str],
+    han_index: int,
+    opened_here: int,
+    stamp_depth: int,
+    in_stamp,
+) -> tuple[int, int]:
+    if in_stamp(han_index) and stamp_depth == 0 and opened_here == 0:
+        out.append(SEG_OPEN)
+        return opened_here + 1, stamp_depth + 1
+    return opened_here, stamp_depth
+
+
+def _apply_han_jobs(
+    body_xml: str,
+    jobs: list[tuple[tuple[int, int], str, str]],
+    *,
+    reflow_paragraphs: bool = True,
+) -> tuple[str, list[tuple[int, int]], list[CoverageSpan]]:
+    """Apply punctuation for several Han ranges in one pass."""
+    if not jobs:
+        return body_xml, [], []
+    atoms = _iter_xml_atoms_segmented(body_xml)
+    tape, _ = _han_tape(atoms)
+    insertions: dict[int, str] = {}
+    para_after: set[int] = set()
+    stamp_ranges: list[tuple[int, int]] = []
+    spans: list[CoverageSpan] = []
+    total = len(tape)
+
+    for han_range, parallel_text, label in jobs:
+        tape_start, tape_end = han_range
+        if tape_start >= tape_end or tape_end > len(tape):
+            continue
+        sticker = han_only(parallel_text)
+        if not sticker:
+            continue
+        sub_overlap = find_han_overlap(tape[tape_start:tape_end], sticker)
+        if sub_overlap is None:
+            continue
+        abs_start = tape_start + sub_overlap[0]
+        abs_end = tape_start + sub_overlap[1]
+        stamp_ranges.append((abs_start, abs_end))
+        seg_ins, seg_para = _collect_insertions(
+            parallel_text,
+            tape,
+            abs_start,
+            abs_end,
+            sticker,
+            split_sentences=label != "comm",
+        )
+        for key, value in seg_ins.items():
+            insertions[key] = insertions.get(key, "") + value
+        para_after.update(seg_para)
+        preview = tape[abs_start:abs_end][:40]
+        spans.append(
+            {
+                "start": abs_start / total if total else 0.0,
+                "end": abs_end / total if total else 0.0,
+                "covered_chars": abs_end - abs_start,
+                "source": label,
+                "preview": preview,
+            }
+        )
+
+    if not stamp_ranges:
+        return body_xml, [], []
+
+    reflow_start = min(start for start, _ in stamp_ranges)
+    reflow_end = max(end for _, end in stamp_ranges)
+    if not reflow_paragraphs:
+        reflow_start = reflow_end = -1
+        para_after = set()
+    out: list[str] = []
+    han_seen = -1
+    opened_here = 0
+    stamp_depth = 0
+    other_seg_depth = 0
+    skip_until = -1
+    in_comm_note = False
+
+    def in_stamp(han_index: int) -> bool:
+        for start, end in stamp_ranges:
+            if start <= han_index < end:
+                return True
+        return False
+
+    def close_stamp_at_boundary(atom: str) -> bool:
+        return (
+            atom in ("</p>", "</note>")
+            or NOTE_OPEN_COMM_RE.fullmatch(atom) is not None
+        )
+
+    for atom_index, atom in enumerate(atoms):
+        if atom_index <= skip_until:
+            continue
+        if _should_skip_line_paragraph_break(
+            atom, atoms, atom_index, han_seen, reflow_start, reflow_end, para_after
+        ):
+            p_open = _paragraph_open_index(atoms, atom_index)
+            if p_open is not None:
+                skip_until = p_open
+            continue
+
+        if close_stamp_at_boundary(atom) and opened_here > 0:
+            opened_here, stamp_depth = _close_stamp_if_open(out, opened_here, stamp_depth)
+
+        if NOTE_OPEN_COMM_RE.fullmatch(atom):
+            in_comm_note = True
+        elif atom == "</note>":
+            in_comm_note = False
+
+        is_han = (not _is_markup(atom)) and HAN_RE.fullmatch(atom)
+        stamp_depth, other_seg_depth = _stamp_depth_delta(atom, stamp_depth, other_seg_depth)
+        if is_han:
+            han_seen += 1
+            opened_here, stamp_depth = _open_stamp_if_needed(
+                out, han_seen, opened_here, stamp_depth, in_stamp
+            )
+        out.append(atom)
+        if is_han:
+            extra = insertions.get(han_seen, "")
+            if extra:
+                out.append(extra)
+            if (
+                han_seen in para_after
+                and not in_comm_note
+                and not _comm_note_follows(atoms, atom_index)
+            ):
+                opened_here, stamp_depth = _emit_paragraph_split(
+                    out, opened_here, stamp_depth, atoms, atom_index
+                )
+                skip_until = max(skip_until, _skip_natural_break_after_split(atoms, atom_index))
+            if opened_here > 0 and not in_stamp(han_seen + 1):
+                opened_here, stamp_depth = _close_stamp_if_open(out, opened_here, stamp_depth)
+    while opened_here > 0:
+        out.append("</seg>")
+        opened_here -= 1
+
+    return "".join(out), stamp_ranges, spans
+
+
+def _slice_text_by_han_range(text: str, han_start: int, han_end: int) -> str:
+    """Extract a substring covering Han indices ``[han_start, han_end)`` plus trailing punct."""
+    if han_start >= han_end:
+        return ""
+    han_count = 0
+    start_char: int | None = None
+    end_char = len(text)
+    for index, char in enumerate(text):
+        if HAN_RE.fullmatch(char):
+            if han_count == han_start:
+                start_char = index
+            han_count += 1
+            if han_count == han_end:
+                end_char = index + 1
+                break
+    if start_char is None:
+        return ""
+    while end_char < len(text) and not HAN_RE.fullmatch(text[end_char]):
+        end_char += 1
+    return text[start_char:end_char]
+
+
+def _align_body_to_reference(
+    body_segments: list[BodySegment],
+    parallel_text: str,
+) -> list[tuple[int, RefSegment]]:
+    """Map each body segment to a reference slice by forward fuzzy Han search.
+
+    Skips body prefix (e.g. Kanripo header material) that is absent from the
+    parallel. Does not require segment-kind alignment at the same index.
+    """
+    ref_han_tape = han_only(parallel_text)
+    ref_cursor = 0
+    pairs: list[tuple[int, RefSegment]] = []
+    for index, body_seg in enumerate(body_segments):
+        sticker = body_seg["han"]
+        if not sticker:
+            continue
+        overlap = find_han_overlap_from(ref_han_tape, sticker, ref_cursor)
+        if overlap is None:
+            continue
+        ref_start, ref_end = overlap
+        pairs.append(
+            (
+                index,
+                {
+                    "kind": body_seg["kind"],
+                    "text": _slice_text_by_han_range(parallel_text, ref_start, ref_end),
+                },
+            )
+        )
+        ref_cursor = ref_end
+    return pairs
+
+
+def _finalize_parallel_xml(body_xml: str, xml: str) -> str:
+    """Return ``xml`` if well-formed, else fail closed with the original body."""
+    xml = relocate_leading_comm_notes(xml)
+    try:
+        assert_well_formed(xml)
+    except ET.ParseError:
+        return body_xml
+    return xml
+
+
+def apply_parallel_segmented(body_xml: str, parallel_text: str) -> ParallelPunctResult:
+    """Match basetext and commentary segments separately against a ctext-style parallel."""
+    merged = merge_split_comm_notes(body_xml)
+    body_segments = parse_body_segments(merged)
+    if not body_segments or not han_only(parallel_text):
+        atoms = _iter_xml_atoms_segmented(merged)
+        tape, _ = _han_tape(atoms)
+        return {
+            "body_xml": merged,
+            "coverage": _empty_coverage(len(tape)),
+            "applied": False,
+        }
+
+    atoms = _iter_xml_atoms_segmented(merged)
+    tape, _ = _han_tape(atoms)
+    total = len(tape)
+    aligned = _align_body_to_reference(body_segments, parallel_text)
+    ref_by_index = {index: ref_seg for index, ref_seg in aligned}
+
+    jobs: list[tuple[tuple[int, int], str, str]] = []
+    han_cursor = 0
+    for index, body_seg in enumerate(body_segments):
+        han_start = han_cursor
+        han_end = han_cursor + len(body_seg["han"])
+        han_cursor = han_end
+        ref_seg = ref_by_index.get(index)
+        if ref_seg is None:
+            continue
+        if find_han_overlap(tape[han_start:han_end], han_only(ref_seg["text"])) is None:
+            continue
+        label = "comm" if body_seg["kind"] == "comm" else "text"
+        jobs.append(((han_start, han_end), ref_seg["text"], label))
+
+    xml, intervals, spans = _apply_han_jobs(merged, jobs, reflow_paragraphs=False)
+    xml = _finalize_parallel_xml(merged, xml)
+    if xml == merged and intervals:
+        intervals, spans = [], []
+    coverage = _coverage_from_intervals(total, intervals, spans)
+    return {"body_xml": xml, "coverage": coverage, "applied": bool(intervals)}
+
+
+def apply_parallel_segmented_sources(
+    body_xml: str, sources: list[dict[str, str]]
+) -> ParallelPunctResult:
+    """Apply segmented punctuation from named sources in order."""
+    xml = merge_split_comm_notes(body_xml)
+    atoms = _iter_xml_atoms_segmented(xml)
+    tape, _ = _han_tape(atoms)
+    total = len(tape)
+    all_intervals: list[tuple[int, int]] = []
+    all_spans: list[CoverageSpan] = []
+    applied_any = False
+
+    for source in sources:
+        text = str(source.get("text") or "")
+        label = str(source.get("label") or source.get("id") or "source")
+        if not text.strip():
+            continue
+        result = apply_parallel_segmented(xml, text)
+        xml = result["body_xml"]
+        if not result["applied"]:
+            continue
+        applied_any = True
+        for span in result["coverage"]["spans"]:
+            start = int(span["start"] * total)
+            end = int(span["end"] * total)
+            all_intervals.append((start, end))
+            all_spans.append({**span, "source": label})
+
+    coverage = _coverage_from_intervals(total, all_intervals, all_spans)
+    return {"body_xml": xml, "coverage": coverage, "applied": applied_any}
+
+
 def coverage_from_stamps(body_xml: str) -> Coverage:
     """Rebuild coverage from existing ``ana="ljb:parallel-punct"`` stretches."""
     atoms = _iter_xml_atoms(body_xml)
@@ -225,58 +907,60 @@ def coverage_from_stamps(body_xml: str) -> Coverage:
 def _apply_one(body_xml: str, parallel_text: str) -> tuple[str, tuple[int, int] | None, str]:
     atoms = _iter_xml_atoms(body_xml)
     tape, _ = _han_tape(atoms)
-    sticker = han_only(parallel_text)
+    match_text = parallel_text
+    if INLINE_COMM_RE.search(parallel_text):
+        match_text = strip_inline_commentary(parallel_text)
+    elif WIKISOURCE_COMM_RE.search(parallel_text):
+        match_text = strip_wikisource_commentary(parallel_text)
+    sticker = han_only(match_text)
     overlap = find_han_overlap(tape, sticker)
     if overlap is None:
         return body_xml, None, ""
 
     tape_start, tape_end = overlap
-    insertions: dict[int, str] = {}
-    para_after: set[int] = set()
-
-    if len(sticker) <= len(tape) and tape[tape_start:tape_end] == sticker:
-        sticker_origin = 0
-    elif len(sticker) > len(tape) and sticker.find(tape) >= 0:
-        sticker_origin = sticker.find(tape)
-    else:
-        sticker_origin = 0
-
-    han_in_sticker = 0
-    pending_nl = 0
-    for char in parallel_text.replace("\r\n", "\n").replace("\r", "\n"):
-        if HAN_RE.fullmatch(char):
-            if pending_nl >= 2:
-                local = han_in_sticker - sticker_origin - 1
-                if 0 <= local < (tape_end - tape_start):
-                    para_after.add(tape_start + local)
-            pending_nl = 0
-            han_in_sticker += 1
-            continue
-        if char == "\n":
-            pending_nl += 1
-            continue
-        pending_nl = 0
-        if char in PUNCT_CHARS:
-            local = han_in_sticker - sticker_origin - 1
-            if 0 <= local < (tape_end - tape_start):
-                at = tape_start + local
-                insertions[at] = insertions.get(at, "") + char
+    insertions, para_after = _collect_insertions(
+        match_text,
+        tape,
+        tape_start,
+        tape_end,
+        sticker,
+    )
 
     out: list[str] = []
     han_seen = -1
     opened_here = 0
     stamp_depth = 0
     other_seg_depth = 0
-    for atom in atoms:
+    skip_until = -1
+
+    def in_overlap(han_index: int) -> bool:
+        return tape_start <= han_index < tape_end
+
+    def close_stamp_at_boundary(atom: str) -> bool:
+        return (
+            atom in ("</p>", "</note>")
+            or NOTE_OPEN_COMM_RE.fullmatch(atom) is not None
+        )
+
+    for atom_index, atom in enumerate(atoms):
+        if atom_index <= skip_until:
+            continue
+        if _should_skip_line_paragraph_break(
+            atom, atoms, atom_index, han_seen, tape_start, tape_end, para_after
+        ):
+            p_open = _paragraph_open_index(atoms, atom_index)
+            if p_open is not None:
+                skip_until = p_open
+            continue
+
+        if close_stamp_at_boundary(atom) and opened_here > 0:
+            opened_here, stamp_depth = _close_stamp_if_open(out, opened_here, stamp_depth)
+
         is_han = (not _is_markup(atom)) and HAN_RE.fullmatch(atom)
         stamp_depth, other_seg_depth = _stamp_depth_delta(atom, stamp_depth, other_seg_depth)
         if is_han:
             han_seen += 1
-            if (
-                han_seen == tape_start
-                and stamp_depth == 0
-                and opened_here == 0
-            ):
+            if han_seen == tape_start and stamp_depth == 0 and opened_here == 0:
                 out.append(SEG_OPEN)
                 opened_here += 1
                 stamp_depth += 1
@@ -285,21 +969,28 @@ def _apply_one(body_xml: str, parallel_text: str) -> tuple[str, tuple[int, int] 
             extra = insertions.get(han_seen, "")
             if extra:
                 out.append(extra)
-            if han_seen in para_after:
-                if opened_here > 0:
-                    out.append(f"</seg></p><p>{SEG_OPEN}")
-                else:
-                    out.append("</p><p>")
+            if han_seen in para_after and not _comm_note_follows(atoms, atom_index):
+                opened_here, stamp_depth = _emit_paragraph_split(
+                    out, opened_here, stamp_depth, atoms, atom_index
+                )
+                skip_until = max(skip_until, _skip_natural_break_after_split(atoms, atom_index))
             if han_seen == tape_end - 1 and opened_here > 0:
-                out.append("</seg>")
-                opened_here -= 1
-                stamp_depth = max(0, stamp_depth - 1)
+                opened_here, stamp_depth = _close_stamp_if_open(out, opened_here, stamp_depth)
     while opened_here > 0:
         out.append("</seg>")
         opened_here -= 1
 
+    result_xml = "".join(out)
+    final_xml = _finalize_parallel_xml(body_xml, result_xml)
+    if final_xml == body_xml and result_xml != body_xml:
+        return body_xml, None, ""
     preview = tape[tape_start:tape_end][:40]
-    return "".join(out), overlap, preview
+    return final_xml, overlap, preview
+
+
+def strip_inline_commentary(parallel_text: str) -> str:
+    """Remove ctext-style inline commentary spans for main-text-only tape matching."""
+    return INLINE_COMM_RE.sub("", parallel_text)
 
 
 def apply_parallel_punctuation(body_xml: str, parallel_text: str) -> ParallelPunctResult:

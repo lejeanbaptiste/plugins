@@ -1,0 +1,20 @@
+{
+  "name": "@ljb/plugin-daozang-import",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Fang Tongzi Daozang corpus download and import plugin for LJB",
+  "ljbPlugin": true,
+  "type": "module",
+  "scripts": {
+    "build": "node esbuild.config.mjs",
+    "smoke": "node scripts/smoke-test.mjs",
+    "build:corpus-pack": "node scripts/build-corpus-pack.mjs",
+    "build:corpus-data": "node scripts/build-corpus-data.mjs",
+    "test": "python3 -m unittest discover -s python/tests -p 'test_*.py' -q",
+    "prepack": "npm run build"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0",
+    "typescript": "^5.9.3"
+  }
+}

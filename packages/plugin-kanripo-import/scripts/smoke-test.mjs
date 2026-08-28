@@ -87,10 +87,14 @@ log('register() wiring OK');
 log('checking register source…');
 assert.match(fs.readFileSync(registerSourcePath, 'utf8'), /kanripo-import-ui/);
 assert.ok(fs.existsSync(worksPath), 'data/krp_works.json missing');
-log('checking python parallel punct…');
-execFileSync('python', ['-m', 'pytest', 'python/tests/test_parallel_punct.py', '-q'], {
+log('checking python convert + gaiji + parallel punct…');
+execFileSync('python', ['-m', 'pytest', 'python/tests', '-q'], {
   cwd: packageRoot,
-  env: { ...process.env, PYTHONPATH: path.join(packageRoot, 'python') },
+  env: {
+    ...process.env,
+    PYTHONPATH: path.join(packageRoot, 'python'),
+    LJB_PLUGIN_INSTALL_PATH: packageRoot,
+  },
   stdio: 'inherit',
 });
 const { size } = fs.statSync(registerPath);

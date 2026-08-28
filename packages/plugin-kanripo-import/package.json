@@ -7,6 +7,11 @@
   "type": "module",
   "scripts": {
     "build": "node esbuild.config.mjs",
+    "download:gaiji": "node scripts/download-gaiji-data.mjs",
+    "fetch:ctext": "node scripts/fetch-ctext-parallel.mjs",
+    "test:ctext-wiki": "node --test scripts/ctext-wiki-parallel.test.mjs",
+    "test:wikisource": "node --test scripts/wikisource-parallel.test.mjs",
+    "test:parallel-batch": "node scripts/test-parallel-batch.mjs",
     "smoke": "node scripts/smoke-test.mjs",
     "prepack": "npm run build"
   },

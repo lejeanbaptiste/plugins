@@ -45,6 +45,8 @@
     "dist/register.mjs",
     "src/register.ts",
     "python",
-    "data/krp_works.json"
+    "data/krp_works.json",
+    "data/gaiji",
+    "data/normalize"
   ]
 }

@@ -1,0 +1,43 @@
+{
+  "manifestVersion": "1.0.0",
+  "id": "daozang-import",
+  "name": "Daozang import",
+  "version": "0.1.0",
+  "description": "Import 方瞳子源 Fang Tongzi Daozang transcriptions from a local file or LJB corpus pack; no third-party downloads.",
+  "author": "Daniel Patrick Morgan",
+  "homepage": "https://github.com/lejeanbaptiste/plugins/tree/main/packages/plugin-daozang-import",
+  "license": "GPL-2.0",
+  "ljb": {
+    "minVersion": "0.1.0"
+  },
+  "languages": ["zh-hant", "zh-hans", "lzh"],
+  "regions": ["east-asia", "china"],
+  "languagePrompt": {
+    "message": "Daozang import is available as a plugin. Open Tools → Plugins to enable “Daozang import”.",
+    "documentLanguages": ["zh-hant", "zh-hans", "lzh"]
+  },
+  "entry": {
+    "kind": "hybrid",
+    "module": "dist/register.mjs",
+    "python": {
+      "module": "daozang_import.ljb_bridge",
+      "runtime": "system",
+      "runtimePath": "python"
+    }
+  },
+  "contributions": {
+    "fileMenu": [
+      {
+        "id": "import-daozang",
+        "label": "Import from Daozang…",
+        "action": "daozang-import.open"
+      }
+    ]
+  },
+  "bundled": [
+    "dist/register.mjs",
+    "src/register.ts",
+    "python",
+    "data/corpus"
+  ]
+}
