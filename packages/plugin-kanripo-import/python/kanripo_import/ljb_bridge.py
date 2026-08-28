@@ -22,6 +22,22 @@ def cli_main() -> None:
 
     op = payload.get("op") or "convert"
 
+    if op == "concordance_lookup":
+        from dataclasses import asdict
+
+        from kanripo_import.concordance import lookup_daozang_rel_path, lookup_dz_id
+
+        kr_id = str(payload.get("kr_id") or "").strip()
+        entry = lookup_daozang_rel_path(kr_id)
+        result = {
+            "kr_id": kr_id,
+            "dz_id": lookup_dz_id(kr_id),
+            "daozang": asdict(entry) if entry else None,
+        }
+        json.dump(result, sys.stdout, ensure_ascii=False)
+        sys.stdout.write("\n")
+        return
+
     if op == "parallel_punct":
         from kanripo_import.parallel_punct import (
             apply_parallel_segmented_sources,

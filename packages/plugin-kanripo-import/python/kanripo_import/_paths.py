@@ -30,3 +30,7 @@ def gaiji_image_path(kr_id: str) -> Path:
 
 def normalize_csv(name: str) -> Path:
     return data_dir() / "normalize" / name
+
+
+def concordance_dir() -> Path:
+    return data_dir() / "concordance"

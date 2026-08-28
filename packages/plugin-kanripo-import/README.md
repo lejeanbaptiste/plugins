@@ -12,7 +12,29 @@ Self-contained hybrid plugin: Mandoku → TEI conversion, bundled gaiji tables/P
 | DPM + hard-replacement CSVs | `data/normalize/` |
 | Parallel punctuation | `python/kanripo_import/parallel_punct.py` |
 | Work search index | `data/krp_works.json` |
+| KR ↔ DZ / Daozang concordance | `data/concordance/` (see below) |
 | Wizard UI | LJB host module (`kanripoImportUi`) |
+
+## Concordance data (Kanripo ↔ 方瞳子 Daozang)
+
+Bundled under `data/concordance/` for offline KR_ID ↔ DZID ↔ bundled Daozang filename lookup:
+
+| File | Role |
+| --- | --- |
+| `krp_dz_collation.csv` | Work-level KR_ID ↔ DZID (~1500 Daoist texts; from `chinese_corpus_metadata`) |
+| `kanripo_org_concordance.csv` | Kanripo.org catalogue ↔ CBETA / DZID |
+| `dz_corpus_works.csv` | DZID ↔ Fang Tongzi corpus filename |
+| `duren_jing_index.csv` | Curated Duren jing KR ↔ DZ paths (`dz_krp/index.csv`) |
+| `kanripo_daozang_map.json` | Runtime map: KR_ID → bundled Daozang `rel_path` |
+| `kanripo_daozang_overrides.csv` | Manual overrides (maintainer-edited) |
+
+Refresh from upstream tables:
+
+```bash
+npm run build:concordance -w @ljb/plugin-kanripo-import
+```
+
+Python API: `kanripo_import.concordance.lookup_daozang_rel_path("KR5a0087")`.
 
 ## Gaiji handling
 

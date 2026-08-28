@@ -47,6 +47,7 @@
     "python",
     "data/krp_works.json",
     "data/gaiji",
-    "data/normalize"
+    "data/normalize",
+    "data/concordance"
   ]
 }

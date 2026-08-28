@@ -1,0 +1,20 @@
+{
+  "packKind": "ljb-kanripo-concordance",
+  "generatedAt": "2026-08-28T16:09:50+00:00",
+  "files": {
+    "krp_dz_collation.csv": "KR_ID ↔ DZID work-level collation (~1500 Daoist texts)",
+    "kanripo_org_concordance.csv": "Kanripo.org catalogue ↔ CBETA/DZID",
+    "dz_corpus_works.csv": "DZID ↔ Fang Tongzi corpus filename (bundled Daozang plugin)",
+    "duren_jing_index.csv": "Curated KR ↔ DZ paths for Duren jing commentaries (dz_krp)",
+    "kanripo_daozang_map.json": "Runtime KR_ID → bundled Daozang rel_path map",
+    "kanripo_daozang_overrides.csv": "Manual KR → Daozang overrides (maintainer-edited)"
+  },
+  "stats": {
+    "krp_dz_rows": 1501,
+    "org_concordance_rows": 10573,
+    "dz_work_rows": 1511,
+    "daozang_index_entries": 1513,
+    "map_entries": 1483,
+    "override_rows": 0
+  }
+}

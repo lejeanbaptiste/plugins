@@ -29,6 +29,8 @@ data/corpus/
 
 These paths are listed in `plugin.manifest.json` → `bundled`, so they are included in the plugin release archive.
 
+**Kanripo crosswalk:** KR_ID → bundled Daozang filename lives in the sibling **kanripo-import** plugin (`data/concordance/kanripo_daozang_map.json`). Rebuild with `npm run build:concordance -w @ljb/plugin-kanripo-import`.
+
 `data/corpus/utf8/` is gitignored locally because of size; CI/release machines run the build script before packaging.
 
 Optional separate redistributable pack (same bytes, different layout):
