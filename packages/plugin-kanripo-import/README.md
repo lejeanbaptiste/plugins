@@ -12,6 +12,7 @@ Self-contained hybrid plugin: Mandoku → TEI conversion, bundled gaiji tables/P
 | DPM + hard-replacement CSVs | `data/normalize/` |
 | Parallel punctuation | `python/kanripo_import/parallel_punct.py` |
 | Work search index | `data/krp_works.json` |
+| Work metadata (authors, dynasty, dates, vols) | `data/metadata/krp_works_by_id.json` |
 | KR ↔ DZ / Daozang concordance | `data/concordance/` (see below) |
 | Wizard UI | LJB host module (`kanripoImportUi`) |
 
@@ -35,6 +36,39 @@ npm run build:concordance -w @ljb/plugin-kanripo-import
 ```
 
 Python API: `kanripo_import.concordance.lookup_daozang_rel_path("KR5a0087")`.
+
+## Work metadata (import entities)
+
+Bundled under `data/metadata/` for offline KR_ID lookup at import time:
+
+| File | Role |
+| --- | --- |
+| `sources/krp_works.csv` | Titles, juan file counts |
+| `sources/skqs_org_authorship.csv` | Authors, dynasty, `DATES`, `EXTENT`, SKQS source |
+| `sources/dz_metadata_works.csv` | Daozang titles, volumes (KR ↔ DZ enrichment) |
+| `sources/dz_metadata_authors.csv` | All Daozang authors with Norbert `person_id` |
+| `krp_works_by_id.json` | Built lookup (SKQS + full DZ metadata when DZID known) |
+
+Rebuild:
+
+```bash
+npm run build:metadata -w @ljb/plugin-kanripo-import
+```
+
+On import, Python attaches a DPM-style `<metadata>` block (citation, work, authorship, date) plus TEI header fields.
+
+**Authorship notes:**
+
+- Most works: author + dynasty + dates from SKQS (`skqs_org_authorship.csv`).
+- **`person_id`**: from `dz_metadata_authors.csv` when KR maps to DZID (~800+ author rows); SKQS rows also gain `person_id` when names match.
+- When SKQS has fewer authors than Daozang, **all** DZ authors are merged in.
+- `vols`: SKQS `EXTENT` (e.g. `11 卷`) when present; else DZ collation or Kanripo juan file count.
+
+Refresh SKQS sources (maintainers):
+
+```bash
+python3 scripts/build-kanripo-metadata.py --sync-from ~/Python/chinese_corpus_metadata
+```
 
 ## Gaiji handling
 

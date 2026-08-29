@@ -38,6 +38,7 @@
     "dist/register.mjs",
     "src/register.ts",
     "python",
-    "data/corpus"
+    "data/corpus",
+    "data/metadata"
   ]
 }

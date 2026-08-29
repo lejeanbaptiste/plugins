@@ -10,6 +10,7 @@
     "smoke": "node scripts/smoke-test.mjs",
     "build:corpus-pack": "node scripts/build-corpus-pack.mjs",
     "build:corpus-data": "node scripts/build-corpus-data.mjs",
+    "build:metadata": "python3 scripts/build-daozang-metadata.py",
     "test": "python3 -m unittest discover -s python/tests -p 'test_*.py' -q",
     "prepack": "npm run build"
   },

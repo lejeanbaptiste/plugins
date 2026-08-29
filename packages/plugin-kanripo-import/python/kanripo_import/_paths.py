@@ -34,3 +34,7 @@ def normalize_csv(name: str) -> Path:
 
 def concordance_dir() -> Path:
     return data_dir() / "concordance"
+
+
+def metadata_dir() -> Path:
+    return data_dir() / "metadata"

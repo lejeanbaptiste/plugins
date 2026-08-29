@@ -29,6 +29,38 @@ data/corpus/
 
 These paths are listed in `plugin.manifest.json` → `bundled`, so they are included in the plugin release archive.
 
+### Work metadata (maintainers)
+
+Rich entity metadata (DZID, Kanripo KR_ID, volumes, Norbert `person_id`, dynasty/date) ships **inside the plugin** under `data/metadata/`. Source CSVs live in `data/metadata/sources/`; the build script reads only those bundled files.
+
+Rebuild the lookup JSON after editing sources:
+
+```bash
+cd plugins/packages/plugin-daozang-import
+npm run build:metadata
+```
+
+Bundled sources (committed with the plugin):
+
+- `data/metadata/sources/dz_metadata_works.csv`
+- `data/metadata/sources/dz_metadata_authors.csv` (Norbert `person_id`)
+- `data/metadata/sources/krp_dz_collation.csv` (KR_ID)
+- `data/metadata/sources/DZ_metadata_normalized.csv` (dynasty/date hints; optional but included)
+
+Output: `data/metadata/dz_works_by_rel_path.json`. On import, Python attaches a DPM-style `<metadata>` block plus TEI header fields (idno, authors, creation).
+
+**Authorship:** every row in `dz_metadata_authors.csv` is included per work (113 multi-author works in the corpus, up to 11 authors on 孫子批注). The build does not collapse to a lead author only.
+
+To refresh sources from your upstream tables (maintainers only, not required for normal use):
+
+```bash
+python3 scripts/build-daozang-metadata.py \
+  --sync-from ~/Python/chinese_corpus_metadata \
+  --normalized-csv ~/Corpora/DaoCanon_txt_chm/DZ_metadata_normalized.csv
+```
+
+When the normalized CSV is absent, dynasty is inferred from the Fang Tongzi filename (e.g. `-元-陳致虛.txt` → 元).
+
 **Kanripo crosswalk:** KR_ID → bundled Daozang filename lives in the sibling **kanripo-import** plugin (`data/concordance/kanripo_daozang_map.json`). Rebuild with `npm run build:concordance -w @ljb/plugin-kanripo-import`.
 
 `data/corpus/utf8/` is gitignored locally because of size; CI/release machines run the build script before packaging.

@@ -9,7 +9,9 @@ from typing import Literal
 from kanripo_import.commentary import extract_commentary_from_text
 from kanripo_import.kanripo_gaiji import copy_gaiji_assets, gaiji_graphic_xml, resolve_kanripo_refs
 from kanripo_import.kanripo_io import extract_kanripo_metadata, load_kanripo_text
+from kanripo_import.metadata_xml import build_metadata_xml, work_metadata_to_dict
 from kanripo_import.normalize_tables import Normalizer, apply_hard_replacements
+from kanripo_import.work_metadata import lookup_work_metadata
 
 NormalizeMode = Literal["off", "dpm", "hard_replacements"]
 
@@ -231,17 +233,44 @@ def convert_kanripo_txt(
         copied_gaiji = copy_gaiji_assets(gaiji_ids, Path(gaiji_dest_dir))
 
     body_xml = body_to_tei_div(body)
+
+    meta = {
+        "title": title,
+        "kanripo_id": kanripo_id,
+        "juan": str(juan),
+        "source": header["source"],
+        "dzid": header["dzid"],
+        "normalize": normalize,
+        "stem": path.stem,
+        "gaiji_ids": gaiji_ids,
+        "gaiji_copied": copied_gaiji,
+    }
+
+    work = lookup_work_metadata(kanripo_id)
+    entities = None
+    metadata_xml = ""
+    if work:
+        meta.update(
+            {
+                "title": work.title or meta["title"],
+                "vols": work.vols,
+                "juan_count": work.juan_count,
+                "catalog_source": work.source,
+                "cbeta_id": work.cbeta_id,
+                "dzid": work.dzid or meta["dzid"],
+                "time_dynasty": work.time_dynasty,
+                "date_not_before": work.date_not_before,
+                "date_not_after": work.date_not_after,
+                "author_dates": work.author_dates,
+            }
+        )
+        entities = work_metadata_to_dict(work)
+        meta["authorship"] = entities.get("authorship", [])
+        metadata_xml = build_metadata_xml(work, juan=str(juan))
+
     return {
-        "meta": {
-            "title": title,
-            "kanripo_id": kanripo_id,
-            "juan": str(juan),
-            "source": header["source"],
-            "dzid": header["dzid"],
-            "normalize": normalize,
-            "stem": path.stem,
-            "gaiji_ids": gaiji_ids,
-            "gaiji_copied": copied_gaiji,
-        },
+        "meta": meta,
         "body_xml": body_xml,
+        "entities": entities,
+        "metadata_xml": metadata_xml,
     }

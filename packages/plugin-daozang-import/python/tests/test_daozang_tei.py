@@ -179,6 +179,22 @@ class TestDaozangTei(unittest.TestCase):
         self.assertIn("上陽子陳觀吾註", juan_files[0]["body_xml"])
         self.assertNotIn("卷中正文", juan_files[0]["body_xml"])
 
+    @unittest.skipUnless(
+        CHEN_ZHIXU.is_file() and (Path(__file__).resolve().parents[2] / "data" / "metadata" / "dz_works_by_rel_path.json").is_file(),
+        "bundled corpus and metadata required",
+    )
+    def test_chen_zhixu_entities_metadata(self) -> None:
+        result = convert_daozang_txt(CHEN_ZHIXU, rel_path=CHEN_ZHIXU.name)
+        meta = result["meta"]
+        self.assertEqual(meta.get("kr_id"), "KR5a0092")
+        self.assertEqual(meta.get("dzid"), "DZ0091")
+        self.assertEqual(meta.get("vols"), "3")
+        auth = meta.get("authorship") or []
+        self.assertEqual(auth[0].get("person_id"), "15493")
+        xml = result.get("metadata_xml") or ""
+        self.assertIn('person_id="15493"', xml)
+        self.assertIn('kr_id="KR5a0092"', xml)
+
     @unittest.skipUnless(DAOZHENJI.is_file(), "bundled corpus not built locally")
     def test_daozhenji_corpus_splits(self) -> None:
         result = convert_daozang_txt(DAOZHENJI, rel_path=DAOZHENJI.name)

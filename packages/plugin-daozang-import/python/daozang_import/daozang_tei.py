@@ -8,6 +8,8 @@ from typing import TypedDict
 
 from daozang_import.corpus_index import parse_dz_no, title_from_filename, variant_from_relpath
 from daozang_import.encoding import decode_legacy_text
+from daozang_import.metadata_xml import build_metadata_xml, work_metadata_to_dict
+from daozang_import.work_metadata import lookup_work_metadata
 
 _XML_ESCAPE = str.maketrans({"&": "&amp;", "<": "&lt;", ">": "&gt;"})
 _SENTENCE_PUNCT = re.compile(r"[。；！？，、]")
@@ -247,6 +249,31 @@ def convert_daozang_txt(path: Path, *, rel_path: str = "") -> dict[str, object]:
         "source": "方瞳子源 Fang Tongzi transcription (homeinmists.com)",
     }
 
+    work = lookup_work_metadata(rel)
+    if work:
+        meta.update(
+            {
+                "dzid": work.dzid,
+                "dz_no": work.dz_no or meta["dz_no"],
+                "title": work.title or meta["title"],
+                "vols": work.vols,
+                "kr_id": work.kr_id,
+                "krp_title": work.krp_title,
+                "edition": work.edition,
+                "variant_class": work.variant_class,
+                "time_dynasty": work.time_dynasty,
+                "date_not_before": work.date_not_before,
+                "date_not_after": work.date_not_after,
+                "author_dates": work.author_dates,
+            }
+        )
+        entities = work_metadata_to_dict(work)
+        metadata_xml = build_metadata_xml(work)
+        meta["authorship"] = entities.get("authorship", [])
+    else:
+        entities = None
+        metadata_xml = ""
+
     segments = _split_juan_segments(lines)
     if len(segments) >= 2:
         juan_files: list[JuanFile] = []
@@ -271,6 +298,8 @@ def convert_daozang_txt(path: Path, *, rel_path: str = "") -> dict[str, object]:
                 "juan_files": juan_files,
                 "split": True,
                 "meta": meta,
+                "entities": entities,
+                "metadata_xml": metadata_xml,
             }
 
     paragraphs = _paragraphs_from_text(normalized)
@@ -279,4 +308,6 @@ def convert_daozang_txt(path: Path, *, rel_path: str = "") -> dict[str, object]:
         "body_xml": body_xml,
         "split": False,
         "meta": meta,
+        "entities": entities,
+        "metadata_xml": metadata_xml,
     }

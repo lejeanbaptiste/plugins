@@ -63,6 +63,7 @@
     "data/krp_works.json",
     "data/gaiji",
     "data/normalize",
-    "data/concordance"
+    "data/concordance",
+    "data/metadata"
   ]
 }

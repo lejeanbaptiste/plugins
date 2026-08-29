@@ -9,6 +9,7 @@
     "build": "node esbuild.config.mjs",
     "download:gaiji": "node scripts/download-gaiji-data.mjs",
     "build:concordance": "python scripts/build-concordance-data.py",
+    "build:metadata": "python3 scripts/build-kanripo-metadata.py",
     "fetch:ctext": "node scripts/fetch-ctext-parallel.mjs",
     "test:ctext-wiki": "node --test scripts/ctext-wiki-parallel.test.mjs",
     "test:wikisource": "node --test scripts/wikisource-parallel.test.mjs",
