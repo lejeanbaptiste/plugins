@@ -2,6 +2,7 @@ import unittest
 
 from daozang_import.corpus_index import (
     CorpusEntry,
+    entry_id,
     parse_dz_no,
     search_index,
     title_from_filename,
@@ -32,6 +33,12 @@ class TestCorpusIndex(unittest.TestCase):
         hits = search_index(entries, "大洞")
         self.assertEqual(len(hits), 1)
         self.assertEqual(hits[0].title, "上清大洞真經")
+
+    def test_entry_id_unique_for_chinese_filenames(self) -> None:
+        first = entry_id("", "trad", "正統道藏洞真部本文類-黃帝陰符經.txt")
+        second = entry_id("", "trad", "正統道藏洞玄部本文類-太上洞玄靈寶十師度人妙經.txt")
+        self.assertNotEqual(first, second)
+        self.assertTrue(first.startswith("dz0000-trad-"))
 
 
 if __name__ == "__main__":

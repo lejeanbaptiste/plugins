@@ -38,6 +38,21 @@
         "id": "punctuate-kanripo",
         "label": "Segment and punctuate…",
         "action": "kanripo-import.punctuate"
+      },
+      {
+        "id": "ai-punctuate-kanripo",
+        "label": "AI punctuate selection…",
+        "action": "kanripo-import.ai-punctuate"
+      },
+      {
+        "id": "purge-punct-kanripo",
+        "label": "Purge punctuation…",
+        "action": "kanripo-import.purge-punct"
+      },
+      {
+        "id": "reflow-paragraphs-kanripo",
+        "label": "Reflow paragraphs…",
+        "action": "kanripo-import.reflow-paragraphs"
       }
     ]
   },

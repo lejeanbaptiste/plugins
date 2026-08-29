@@ -148,6 +148,9 @@ def _inline_to_xml(text: str) -> str:
         if ch == "¶" and in_note:
             index += 1
             continue
+        if ch == "/" and in_note:
+            index += 1
+            continue
         buf.append(ch)
         index += 1
     flush()

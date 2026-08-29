@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 from dataclasses import asdict, dataclass
@@ -55,9 +56,10 @@ def title_from_filename(stem: str, dz_no: str) -> str:
 
 
 def entry_id(dz_no: str, variant: str, rel_path: str) -> str:
-    base = f"dz{dz_no or '0000'}-{variant}"
-    slug = re.sub(r"[^a-z0-9]+", "-", rel_path.lower()).strip("-")
-    return f"{base}-{slug}" if slug else base
+    """Stable, unique id for index rows (Chinese filenames have no ASCII slug)."""
+    dz = (dz_no or "0").zfill(4)
+    digest = hashlib.sha1(rel_path.encode("utf-8")).hexdigest()[:12]
+    return f"dz{dz}-{variant}-{digest}"
 
 
 def build_index(utf8_root: Path) -> list[CorpusEntry]:

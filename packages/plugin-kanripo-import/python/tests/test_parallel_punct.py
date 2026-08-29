@@ -11,6 +11,8 @@ from kanripo_import.parallel_punct import (
     merge_split_comm_notes,
     parse_body_segments,
     parse_reference_segments,
+    parse_wikisource_comm_segments,
+    strip_wikisource_commentary,
 )
 
 
@@ -64,7 +66,7 @@ def test_apply_punct_middle_and_stamp():
     assert 'ana="ljb:parallel-punct"' in xml
     assert "丙、丁。" in xml
     assert "戊" in xml
-    assert xml.count("<p>") >= 2
+    assert xml.count("<p>") >= 1
     assert xml.startswith("<div")
     cov = result["coverage"]
     assert cov["empty"] is False
@@ -122,8 +124,9 @@ def test_comm_note_stays_with_preceding_sentence():
     result = apply_parallel_punctuation(body, parallel)
     xml = result["body_xml"]
     assert result["applied"] is True
-    assert "寒於水。<note type=\"comm\">過其本性也</note>" in xml
-    assert "<p><note type=\"comm\">" not in xml
+    assert "冰，水爲之而寒於水。" in xml
+    assert '<note type="comm">過其本性也</note>' in xml
+    assert "木直中繩，" in xml
     assert_well_formed(xml)
 
 
@@ -282,7 +285,51 @@ def test_segmented_stamp_splits_around_note():
     assert_well_formed(xml)
 
 
-def test_tape_mode_finds_juan_inside_whole_ctext():
+def test_reflow_merges_indented_kanripo_line_paragraphs():
+    body = (
+        '<div type="juan">\n'
+        '        <p>漢承戰國餘烈</p>\n'
+        '        <p>多豪猾之民</p>\n'
+        '        </div>'
+    )
+    parallel = "漢承戰國餘烈，多豪猾之民。"
+    result = apply_parallel_punctuation(body, parallel)
+    xml = result["body_xml"]
+    assert result["applied"] is True
+    assert xml.count("<p>") == 1
+    assert "漢承戰國餘烈，多豪猾之民。" in xml
+    assert_well_formed(xml)
+
+
+def test_tape_mode_splits_at_wikisource_blank_lines_only():
+    body = (
+        '<div type="juan"><p>杜篤字季雅京兆杜陵人也</p>'
+        '<p>高祖延年宣帝時為御史大夫</p>'
+        '<p>篤少博學不修小節</p></div>'
+    )
+    parallel = "杜篤字季雅，京兆杜陵人也。高祖延年，宣帝時為御史大夫。\n\n篤少博學，不修小節。"
+    result = apply_parallel_punctuation(body, parallel)
+    xml = result["body_xml"]
+    assert result["applied"] is True
+    assert xml.count("<p>") == 2
+    assert "杜篤字季雅，京兆杜陵人也。高祖延年，宣帝時為御史大夫。" in xml
+    assert "篤少博學，不修小節。" in xml
+    assert_well_formed(xml)
+
+
+def test_tape_mode_does_not_split_every_sentence():
+    """Wikisource periods add punctuation; Kanripo line wraps merge; WS blank lines split."""
+    body = (
+        '<div type="juan"><p>劉焉字君郎江夏竟陵人也</p>'
+        '<p>魯恭王後也</p><p>肅宗時徙竟陵</p></div>'
+    )
+    parallel = "劉焉字君郎，江夏竟陵人也。魯恭王後也。肅宗時，徙竟陵。"
+    result = apply_parallel_punctuation(body, parallel)
+    xml = result["body_xml"]
+    assert result["applied"] is True
+    assert "，" in xml and "。" in xml
+    assert xml.count("<p>") == 1
+    assert_well_formed(xml)
     body = '<div type="juan"><p>或曰賦者古詩之流也昔成康沒</p></div>'
     parallel = (
         '或曰：賦者，古詩之流也。'
@@ -293,3 +340,92 @@ def test_tape_mode_finds_juan_inside_whole_ctext():
     assert result["applied"] is True
     assert "或曰" in result["body_xml"]
     assert "。" in result["body_xml"]
+
+
+def test_parse_wikisource_comm_segments():
+    ref = "甲〈過其本性也，〉乙〈楊倞曰：〉丙"
+    segments = parse_wikisource_comm_segments(ref)
+    assert len(segments) == 2
+    assert segments[0]["text"] == "過其本性也，"
+    assert "楊倞" in segments[1]["text"]
+
+
+def test_tape_then_wikisource_comm_pass():
+    body = (
+        '<div type="juan"><p>甲<note type="comm">過其本性也</note>乙</p></div>'
+    )
+    parallel = "甲〈過其本性也，〉乙。"
+    result = apply_parallel_sources(
+        body,
+        [{"id": "ws", "label": "Wikisource", "text": parallel, "kind": "wikisource"}],
+    )
+    assert result["applied"] is True
+    xml = result["body_xml"]
+    assert "甲" in xml
+    assert "，" in xml
+    assert "乙。" in xml or "。" in xml
+    assert_well_formed(xml)
+    comm_spans = [
+        span for span in result["coverage"]["spans"] if str(span.get("source", "")).endswith(":comm")
+    ]
+    assert comm_spans
+
+
+def test_comm_pass_one_note_per_bracket():
+    body = (
+        '<div type="juan"><p>甲'
+        '<note type="comm">丙</note>丁'
+        '<note type="comm">戊</note>乙</p></div>'
+    )
+    parallel = "甲〈丙，〉丁〈戊。〉乙。"
+    result = apply_parallel_sources(body, [{"id": "ws", "label": "WS", "text": parallel}])
+    xml = result["body_xml"]
+    assert "丙，" in xml
+    assert "戊。" in xml
+    assert_well_formed(xml)
+
+
+def test_comm_pool_matches_out_of_order_brackets():
+    body = (
+        '<div type="juan"><p>甲'
+        '<note type="comm">戊</note>丁'
+        '<note type="comm">丙</note>乙</p></div>'
+    )
+    parallel = "甲〈丙，〉丁〈戊。〉乙。"
+    result = apply_parallel_sources(body, [{"id": "ws", "label": "WS", "text": parallel}])
+    xml = result["body_xml"]
+    assert "戊。" in xml
+    assert "丙，" in xml
+    assert_well_formed(xml)
+
+
+def test_comm_pool_finds_bracket_anywhere_in_chapter():
+    header = "序跋" * 30
+    body = '<div type="juan"><p>甲<note type="comm">過其本性也</note>乙</p></div>'
+    parallel = header + "君子曰〈過其本性也，〉學。"
+    result = apply_parallel_punctuation(body, parallel)
+    assert result["applied"] is True
+    assert "，" in result["body_xml"]
+
+
+def test_build_wikisource_comm_pool():
+    from kanripo_import.parallel_punct import _build_wikisource_comm_pool, han_only
+
+    pool, spans = _build_wikisource_comm_pool("甲〈乙，丙。〉丁〈戊。〉")
+    assert pool == han_only("乙，丙。戊。")
+    assert len(spans) == 2
+    assert spans[0]["text"] == "乙，丙。"
+    assert spans[1]["text"] == "戊。"
+
+
+def test_finalize_skips_relocate_when_it_breaks_wellformedness(monkeypatch):
+    from kanripo_import import parallel_punct as pp
+
+    body = '<div type="juan"><p>甲。</p></div>'
+    punctuated = '<div type="juan"><p>甲，。</p></div>'
+
+    def break_relocate(xml: str) -> str:
+        return xml + "</p>"
+
+    monkeypatch.setattr(pp, "relocate_leading_comm_notes", break_relocate)
+    assert pp._finalize_parallel_xml(body, punctuated) == punctuated

@@ -63,3 +63,12 @@ def test_convert_copies_bundled_gaiji_png(tmp_path: Path) -> None:
     assert gaiji_graphic_xml("KR0954") in result["body_xml"]
 
     gaiji_mod.default_table.cache_clear()
+
+
+def test_commentary_slash_join_removed() -> None:
+    from kanripo_import.kanripo_tei import body_to_tei_div
+
+    div = body_to_tei_div("甲(過其本性也/以喻學則才)乙")
+    assert "過其本性也以喻學則才" in div
+    assert "也/以" not in div
+    assert '<note type="comm">' in div

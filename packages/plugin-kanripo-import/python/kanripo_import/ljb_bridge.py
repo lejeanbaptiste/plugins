@@ -43,6 +43,7 @@ def cli_main() -> None:
             apply_parallel_segmented_sources,
             apply_parallel_sources,
             coverage_from_stamps,
+            enrich_parallel_result,
             merge_split_comm_notes,
         )
 
@@ -72,8 +73,58 @@ def cli_main() -> None:
         if mode == "segmented":
             result = apply_parallel_segmented_sources(body_xml, sources)
         else:
-            result = apply_parallel_sources(body_xml, sources)
+            used_chapter_ids = payload.get("used_chapter_ids")
+            if not isinstance(used_chapter_ids, list):
+                used_chapter_ids = []
+            result = apply_parallel_sources(
+                body_xml,
+                sources,
+                used_chapter_ids=[str(item) for item in used_chapter_ids],
+            )
+        enrich_parallel_result(result, sources)
         json.dump(result, sys.stdout, ensure_ascii=False)
+        sys.stdout.write("\n")
+        return
+
+    if op == "ai_punct_list_segments":
+        from kanripo_import.ai_punct import bridge_list_segments
+
+        json.dump(bridge_list_segments(payload), sys.stdout, ensure_ascii=False)
+        sys.stdout.write("\n")
+        return
+
+    if op == "ai_punct_apply":
+        from kanripo_import.ai_punct import bridge_apply
+
+        json.dump(bridge_apply(payload), sys.stdout, ensure_ascii=False)
+        sys.stdout.write("\n")
+        return
+
+    if op == "purge_punct":
+        from kanripo_import.ai_punct import bridge_purge
+
+        json.dump(bridge_purge(payload), sys.stdout, ensure_ascii=False)
+        sys.stdout.write("\n")
+        return
+
+    if op == "reflow_paragraphs":
+        from kanripo_import.ai_punct import bridge_reflow
+
+        json.dump(bridge_reflow(payload), sys.stdout, ensure_ascii=False)
+        sys.stdout.write("\n")
+        return
+
+    if op == "ai_punct_parallel_apply":
+        from kanripo_import.ai_punct import bridge_ai_parallel_apply
+
+        json.dump(bridge_ai_parallel_apply(payload), sys.stdout, ensure_ascii=False)
+        sys.stdout.write("\n")
+        return
+
+    if op == "punct_coverage":
+        from kanripo_import.ai_punct import bridge_punct_coverage
+
+        json.dump(bridge_punct_coverage(payload), sys.stdout, ensure_ascii=False)
         sys.stdout.write("\n")
         return
 

@@ -8,11 +8,21 @@ const FETCH_HEADERS = {
 };
 
 const WIKISOURCE_HOST_RE = /^(?:[a-z-]+\.)?wikisource\.org$/i;
-const VOLUME_SUFFIX_RE = /\/卷(\d+)$/;
+const VOLUME_SUFFIX_RE = /\/卷(\d+)(?:[上中下])?$/;
 const CHAPTER_SKIP_RE = /(?:^|\/)(?:全覽|序言?)$/;
 const FETCH_DELAY_MS = 300;
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/** True when the title is a subpage (卷, 篇, etc.), not a bare work index like ``後漢書``. */
+export function isWikisourceSubPageTitle(title) {
+  return String(title || '').includes('/');
+}
+
+export function shouldFetchSingleWikisourcePage(title, fetchAll) {
+  if (fetchAll) return false;
+  return VOLUME_SUFFIX_RE.test(title) || isWikisourceSubPageTitle(title);
+}
 
 export function parseWikisourceUrl(url) {
   let parsed;
@@ -62,7 +72,7 @@ export function resolveEditionRoot(pageTitle, linkTitles) {
   const title = String(pageTitle || '').trim();
   const titles = linkTitles.map((item) => String(item || '').trim()).filter(Boolean);
 
-  const volumeParent = title.match(/^(.+)\/卷\d+$/);
+  const volumeParent = title.match(/^(.+)\/卷\d+(?:[上中下])?$/);
   if (volumeParent) return volumeParent[1];
 
   const directVolumes = listVolumePages(titles, title);
@@ -257,10 +267,17 @@ export async function fetchWikisourceParallel(url, options = {}) {
       url: url.trim(),
       pageTitle: single.pageTitle,
       sections: catalogToSections(catalog),
+      chapters: [
+        {
+          id: parsed.title,
+          title: parsed.title.split('/').pop() || parsed.title,
+          text: single.text,
+        },
+      ],
     };
   }
 
-  if (!fetchAll && VOLUME_SUFFIX_RE.test(parsed.title)) {
+  if (shouldFetchSingleWikisourcePage(parsed.title, fetchAll)) {
     const single = await fetchPageText(parsed.apiHost, parsed.title);
     return {
       text: single.text,
@@ -269,6 +286,13 @@ export async function fetchWikisourceParallel(url, options = {}) {
       url: url.trim(),
       pageTitle: single.pageTitle,
       sections: catalogToSections(catalog),
+      chapters: [
+        {
+          id: parsed.title,
+          title: parsed.title.split('/').pop() || parsed.title,
+          text: single.text,
+        },
+      ],
     };
   }
 
@@ -280,11 +304,17 @@ export async function fetchWikisourceParallel(url, options = {}) {
   }
 
   const parts = [];
+  const chapters = [];
   for (let index = 0; index < volumes.length; index += 1) {
     if (index > 0) await sleep(FETCH_DELAY_MS);
     const volumeTitle = volumes[index];
     const volume = await fetchPageText(parsed.apiHost, volumeTitle);
     parts.push(volume.text);
+    chapters.push({
+      id: volumeTitle,
+      title: volumeTitle.split('/').pop() || volumeTitle,
+      text: volume.text,
+    });
   }
 
   return {
@@ -294,5 +324,6 @@ export async function fetchWikisourceParallel(url, options = {}) {
     url: url.trim(),
     pageTitle: editionRoot,
     sections: catalogToSections(catalog),
+    chapters,
   };
 }

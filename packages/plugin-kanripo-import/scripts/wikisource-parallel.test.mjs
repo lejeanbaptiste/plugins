@@ -5,7 +5,9 @@ import {
   listVolumePages,
   parseWikisourceUrl,
   resolveEditionRoot,
+  shouldFetchSingleWikisourcePage,
   volumeNumberFromTitle,
+  isWikisourceSubPageTitle,
 } from './wikisource-parallel.mjs';
 
 test('parseWikisourceUrl accepts wiki and zh-hant paths', () => {
@@ -49,4 +51,24 @@ test('listVolumePages sorts 卷 pages numerically', () => {
     '荀子 (四庫全書本)/卷10',
   ]);
   assert.equal(volumeNumberFromTitle('荀子 (四庫全書本)/卷10'), 10);
+});
+
+test('volumeNumberFromTitle accepts 上中下 suffixes', () => {
+  assert.equal(volumeNumberFromTitle('後漢書/卷80上'), 80);
+  assert.equal(
+    resolveEditionRoot('後漢書/卷80上', ['後漢書/卷80下', '後漢書/卷79']),
+    '後漢書',
+  );
+});
+
+test('isWikisourceSubPageTitle distinguishes index from subpages', () => {
+  assert.equal(isWikisourceSubPageTitle('後漢書/卷79上'), true);
+  assert.equal(isWikisourceSubPageTitle('荀子/勸學篇'), true);
+  assert.equal(isWikisourceSubPageTitle('後漢書'), false);
+});
+
+test('shouldFetchSingleWikisourcePage for editor fetches', () => {
+  assert.equal(shouldFetchSingleWikisourcePage('後漢書/卷79上', false), true);
+  assert.equal(shouldFetchSingleWikisourcePage('後漢書', false), false);
+  assert.equal(shouldFetchSingleWikisourcePage('後漢書', true), false);
 });

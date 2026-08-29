@@ -28,6 +28,9 @@ MIN_BLOCK = 8
 MIN_STICKER_COVER = 0.8
 MAX_TAPE_GAP = 20
 SENTENCE_END_PUNCT = frozenset("。！？")
+LOW_OVERLAP_RATIO = 0.30
+MIN_HAN_FOR_PUNCT_CHECK = 40
+MIN_PUNCT_PER_100_HAN = 0.75
 
 
 class CoverageSpan(TypedDict):
@@ -52,6 +55,12 @@ class ParallelPunctResult(TypedDict):
     body_xml: str
     coverage: Coverage
     applied: bool
+
+
+class ParallelQualityWarning(TypedDict):
+    code: str
+    severity: str
+    message: str
 
 
 class BodySegment(TypedDict):
@@ -199,6 +208,30 @@ def find_han_overlap(tape: str, sticker: str) -> tuple[int, int] | None:
     covered = _union_covered(intervals)
     if covered / len(tape) >= MIN_STICKER_COVER:
         return min(item[0] for item in intervals), max(item[1] for item in intervals)
+    return None
+
+
+def find_han_overlap_flexible(tape: str, sticker: str) -> tuple[int, int] | None:
+    """Like ``find_han_overlap`` but retry after each chapter head marker in the tape."""
+    overlap = find_han_overlap(tape, sticker)
+    if overlap is not None:
+        return overlap
+    search_at = 0
+    markers = "篇紀傳志卷"
+    while search_at < len(tape):
+        next_at = len(tape)
+        for marker in markers:
+            index = tape.find(marker, search_at)
+            if index >= 0:
+                next_at = min(next_at, index + 1)
+        if next_at >= len(tape):
+            break
+        start = next_at
+        search_at = start
+        overlap = find_han_overlap(tape[start:], sticker)
+        if overlap is not None:
+            rel_start, rel_end = overlap
+            return start + rel_start, start + rel_end
     return None
 
 
@@ -401,18 +434,158 @@ def parse_reference_segments(parallel_text: str) -> list[RefSegment]:
     return _parse_paren_reference_segments(parallel_text)
 
 
+def parse_wikisource_comm_segments(parallel_text: str) -> list[RefSegment]:
+    """Extract each Wikisource ``〈…〉`` interlinear note as one comm segment."""
+    segments: list[RefSegment] = []
+    for match in WIKISOURCE_COMM_RE.finditer(parallel_text):
+        inner = match.group(0)[1:-1]
+        if inner.strip() or han_only(inner):
+            segments.append({"kind": "comm", "text": inner})
+    return segments
+
+
+class CommPoolSpan(TypedDict):
+    start: int
+    end: int
+    text: str
+
+
+def _build_wikisource_comm_pool(parallel_text: str) -> tuple[str, list[CommPoolSpan]]:
+    """Concatenate all ``〈…〉`` Han into one searchable pool with span metadata."""
+    pool_parts: list[str] = []
+    spans: list[CommPoolSpan] = []
+    pos = 0
+    for segment in parse_wikisource_comm_segments(parallel_text):
+        ref_text = segment["text"]
+        ref_han = han_only(ref_text)
+        if not ref_han:
+            continue
+        spans.append({"start": pos, "end": pos + len(ref_han), "text": ref_text})
+        pool_parts.append(ref_han)
+        pos += len(ref_han)
+    return "".join(pool_parts), spans
+
+
+def _ref_text_for_pool_overlap(
+    spans: list[CommPoolSpan],
+    pool_start: int,
+    pool_end: int,
+) -> str:
+    """Pick the bracket whose Han span best overlaps the pool match."""
+    best: CommPoolSpan | None = None
+    best_size = 0
+    for span in spans:
+        overlap_start = max(span["start"], pool_start)
+        overlap_end = min(span["end"], pool_end)
+        size = max(0, overlap_end - overlap_start)
+        if size > best_size:
+            best_size = size
+            best = span
+    return best["text"] if best is not None else ""
+
+
+def _find_comm_pool_overlap(pool_han: str, sticker: str) -> tuple[int, int] | None:
+    """Locate ``sticker`` anywhere in the commentary Han pool."""
+    if not pool_han or not sticker:
+        return None
+    overlap = find_han_overlap(pool_han, sticker)
+    if overlap is not None:
+        return overlap
+    if len(sticker) <= len(pool_han):
+        exact = pool_han.find(sticker)
+        if exact >= 0:
+            return exact, exact + len(sticker)
+    if len(pool_han) <= len(sticker):
+        exact = sticker.find(pool_han)
+        if exact >= 0:
+            return 0, len(pool_han)
+    return None
+
+
+def _comm_note_han_jobs(
+    body_xml: str,
+    parallel_text: str,
+) -> list[tuple[tuple[int, int], str, str]]:
+    """Pair each comm note with the best-matching ``〈…〉`` via the comm Han pool."""
+    merged = merge_split_comm_notes(body_xml)
+    pool_han, pool_spans = _build_wikisource_comm_pool(parallel_text)
+    if not pool_han or not pool_spans:
+        return []
+
+    body_segments = parse_body_segments(merged)
+    han_cursor = 0
+    jobs: list[tuple[tuple[int, int], str, str]] = []
+
+    for seg in body_segments:
+        han_start = han_cursor
+        han_end = han_cursor + len(seg["han"])
+        han_cursor = han_end
+        if seg["kind"] != "comm" or not seg["han"]:
+            continue
+        sticker = seg["han"]
+        overlap = _find_comm_pool_overlap(pool_han, sticker)
+        if overlap is None:
+            continue
+        pool_start, pool_end = overlap
+        ref_text = _ref_text_for_pool_overlap(pool_spans, pool_start, pool_end)
+        if not ref_text.strip() and not han_only(ref_text):
+            continue
+        jobs.append(((han_start, han_end), ref_text, "comm"))
+    return jobs
+
+
+def apply_comm_parallel_punctuation(
+    body_xml: str,
+    parallel_text: str,
+    *,
+    source_label: str = "comm",
+) -> ParallelPunctResult:
+    """Second pass: punctuate comm notes via infix search in the ``〈…〉`` Han pool."""
+    merged = merge_split_comm_notes(body_xml)
+    atoms = _iter_xml_atoms_segmented(merged)
+    tape, _ = _han_tape(atoms)
+    total = len(tape)
+    jobs = _comm_note_han_jobs(merged, parallel_text)
+    if not jobs:
+        return {
+            "body_xml": body_xml,
+            "coverage": _empty_coverage(total),
+            "applied": False,
+        }
+
+    xml, intervals, spans = _apply_han_jobs(merged, jobs, reflow_paragraphs=False)
+    for span in spans:
+        span["source"] = source_label
+    xml = _finalize_parallel_xml(merged, xml)
+    if xml == merged and intervals:
+        intervals, spans = [], []
+    coverage = _coverage_from_intervals(total, intervals, spans)
+    return {
+        "body_xml": xml,
+        "coverage": coverage,
+        "applied": bool(intervals),
+    }
+
+
 def _sticker_to_tape_map(sticker_han: str, tape: str, tape_start: int, tape_end: int) -> dict[int, int]:
-    """Map sticker han index → local index in ``tape[tape_start:tape_end]`` for equal chars."""
+    """Map sticker han index → local index in ``tape[tape_start:tape_end]``.
+
+    Uses equal runs plus 1:1 pairing inside replace blocks so variant normalization
+    in the parallel (e.g. 庻→庶) still transfers punctuation.
+    """
     sub = tape[tape_start:tape_end]
     if not sticker_han or not sub:
         return {}
     mapping: dict[int, int] = {}
     matcher = SequenceMatcher(a=sticker_han, b=sub, autojunk=False)
     for op, a0, a1, b0, b1 in matcher.get_opcodes():
-        if op != "equal":
-            continue
-        for offset in range(a1 - a0):
-            mapping[a0 + offset] = b0 + offset
+        if op == "equal":
+            for offset in range(a1 - a0):
+                mapping[a0 + offset] = b0 + offset
+        elif op == "replace":
+            pair_len = min(a1 - a0, b1 - b0)
+            for offset in range(pair_len):
+                mapping[a0 + offset] = b0 + offset
     return mapping
 
 
@@ -463,7 +636,7 @@ def _comm_note_follows(atoms: list[str], index: int) -> bool:
     cursor = index + 1
     while cursor < len(atoms):
         atom = atoms[cursor]
-        if atom in ("\n", "\r"):
+        if _is_insignificant_whitespace_atom(atom):
             cursor += 1
             continue
         if _comm_note_atom(atom):
@@ -519,9 +692,14 @@ def _is_p_open(atom: str) -> bool:
     return atom == "<p>" or (atom.startswith("<p ") and atom.endswith(">"))
 
 
+def _is_insignificant_whitespace_atom(atom: str) -> bool:
+    """True for atoms that only carry formatting between XML tags."""
+    return atom in ("\n", "\r", "\t") or (len(atom) > 0 and atom.strip() == "")
+
+
 def _paragraph_open_index(atoms: list[str], index: int) -> int | None:
     cursor = index + 1
-    while cursor < len(atoms) and atoms[cursor] in ("\n", "\r"):
+    while cursor < len(atoms) and _is_insignificant_whitespace_atom(atoms[cursor]):
         cursor += 1
     if cursor < len(atoms) and _is_p_open(atoms[cursor]):
         return cursor
@@ -556,7 +734,7 @@ def _emit_paragraph_split(
 ) -> tuple[int, int]:
     """Insert ``</p><p>`` unless the source already breaks here."""
     cursor = index + 1
-    while cursor < len(atoms) and atoms[cursor] in ("\n", "\r"):
+    while cursor < len(atoms) and _is_insignificant_whitespace_atom(atoms[cursor]):
         cursor += 1
     if cursor < len(atoms) and atoms[cursor] == "</p>":
         return opened_here, stamp_depth
@@ -569,7 +747,7 @@ def _emit_paragraph_split(
 def _skip_natural_break_after_split(atoms: list[str], index: int) -> int:
     """Skip source ``</p><p>`` that duplicates a split we just inserted."""
     cursor = index + 1
-    while cursor < len(atoms) and atoms[cursor] in ("\n", "\r"):
+    while cursor < len(atoms) and _is_insignificant_whitespace_atom(atoms[cursor]):
         cursor += 1
     if cursor < len(atoms) and atoms[cursor] == "</p>":
         p_open = _paragraph_open_index(atoms, cursor)
@@ -714,10 +892,14 @@ def _apply_han_jobs(
                 and not in_comm_note
                 and not _comm_note_follows(atoms, atom_index)
             ):
+                before_len = len(out)
                 opened_here, stamp_depth = _emit_paragraph_split(
                     out, opened_here, stamp_depth, atoms, atom_index
                 )
-                skip_until = max(skip_until, _skip_natural_break_after_split(atoms, atom_index))
+                if len(out) > before_len:
+                    skip_until = max(
+                        skip_until, _skip_natural_break_after_split(atoms, atom_index)
+                    )
             if opened_here > 0 and not in_stamp(han_seen + 1):
                 opened_here, stamp_depth = _close_stamp_if_open(out, opened_here, stamp_depth)
     while opened_here > 0:
@@ -783,13 +965,17 @@ def _align_body_to_reference(
 
 
 def _finalize_parallel_xml(body_xml: str, xml: str) -> str:
-    """Return ``xml`` if well-formed, else fail closed with the original body."""
-    xml = relocate_leading_comm_notes(xml)
+    """Return punctuated ``xml`` when well-formed, else fail closed with the original body."""
     try:
         assert_well_formed(xml)
     except ET.ParseError:
         return body_xml
-    return xml
+    relocated = relocate_leading_comm_notes(xml)
+    try:
+        assert_well_formed(relocated)
+    except ET.ParseError:
+        return xml
+    return relocated
 
 
 def apply_parallel_segmented(body_xml: str, parallel_text: str) -> ParallelPunctResult:
@@ -904,37 +1090,43 @@ def coverage_from_stamps(body_xml: str) -> Coverage:
     return _coverage_from_intervals(total, intervals, spans)
 
 
-def _apply_one(body_xml: str, parallel_text: str) -> tuple[str, tuple[int, int] | None, str]:
-    atoms = _iter_xml_atoms(body_xml)
-    tape, _ = _han_tape(atoms)
+MIN_AI_HAN_MAP_RATIO = 0.75
+
+
+def _normalize_parallel_match_text(parallel_text: str) -> str:
     match_text = parallel_text
     if INLINE_COMM_RE.search(parallel_text):
         match_text = strip_inline_commentary(parallel_text)
     elif WIKISOURCE_COMM_RE.search(parallel_text):
         match_text = strip_wikisource_commentary(parallel_text)
-    sticker = han_only(match_text)
-    overlap = find_han_overlap(tape, sticker)
-    if overlap is None:
-        return body_xml, None, ""
+    return match_text
 
-    tape_start, tape_end = overlap
+
+def _apply_parallel_at_range(
+    body_xml: str,
+    match_text: str,
+    sticker: str,
+    tape: str,
+    tape_start: int,
+    tape_end: int,
+) -> tuple[str, tuple[int, int] | None, str]:
     insertions, para_after = _collect_insertions(
         match_text,
         tape,
         tape_start,
         tape_end,
         sticker,
+        split_sentences=False,
     )
-
+    atoms = _iter_xml_atoms(body_xml)
     out: list[str] = []
     han_seen = -1
     opened_here = 0
     stamp_depth = 0
     other_seg_depth = 0
     skip_until = -1
-
-    def in_overlap(han_index: int) -> bool:
-        return tape_start <= han_index < tape_end
+    reflow_start = tape_start
+    reflow_end = tape_end
 
     def close_stamp_at_boundary(atom: str) -> bool:
         return (
@@ -946,7 +1138,7 @@ def _apply_one(body_xml: str, parallel_text: str) -> tuple[str, tuple[int, int] 
         if atom_index <= skip_until:
             continue
         if _should_skip_line_paragraph_break(
-            atom, atoms, atom_index, han_seen, tape_start, tape_end, para_after
+            atom, atoms, atom_index, han_seen, reflow_start, reflow_end, para_after
         ):
             p_open = _paragraph_open_index(atoms, atom_index)
             if p_open is not None:
@@ -970,10 +1162,14 @@ def _apply_one(body_xml: str, parallel_text: str) -> tuple[str, tuple[int, int] 
             if extra:
                 out.append(extra)
             if han_seen in para_after and not _comm_note_follows(atoms, atom_index):
+                before_len = len(out)
                 opened_here, stamp_depth = _emit_paragraph_split(
                     out, opened_here, stamp_depth, atoms, atom_index
                 )
-                skip_until = max(skip_until, _skip_natural_break_after_split(atoms, atom_index))
+                if len(out) > before_len:
+                    skip_until = max(
+                        skip_until, _skip_natural_break_after_split(atoms, atom_index)
+                    )
             if han_seen == tape_end - 1 and opened_here > 0:
                 opened_here, stamp_depth = _close_stamp_if_open(out, opened_here, stamp_depth)
     while opened_here > 0:
@@ -985,7 +1181,68 @@ def _apply_one(body_xml: str, parallel_text: str) -> tuple[str, tuple[int, int] 
     if final_xml == body_xml and result_xml != body_xml:
         return body_xml, None, ""
     preview = tape[tape_start:tape_end][:40]
-    return final_xml, overlap, preview
+    return final_xml, (tape_start, tape_end), preview
+
+
+def apply_scoped_parallel_punctuation(
+    body_xml: str,
+    parallel_text: str,
+    tape_start: int,
+    tape_end: int,
+    *,
+    min_map_ratio: float = MIN_AI_HAN_MAP_RATIO,
+) -> ParallelPunctResult:
+    """Apply parallel punct on a known Han range (AI segments — skip global overlap search)."""
+    atoms = _iter_xml_atoms(body_xml)
+    tape, _ = _han_tape(atoms)
+    total = len(tape)
+    empty: ParallelPunctResult = {
+        "body_xml": body_xml,
+        "coverage": _empty_coverage(total),
+        "applied": False,
+    }
+    if tape_start < 0 or tape_end > total or tape_start >= tape_end:
+        return empty
+    match_text = _normalize_parallel_match_text(parallel_text)
+    sticker = han_only(match_text)
+    if not sticker:
+        return empty
+    mapping = _sticker_to_tape_map(sticker, tape, tape_start, tape_end)
+    if len(mapping) / len(sticker) < min_map_ratio:
+        return empty
+    final_xml, overlap, preview = _apply_parallel_at_range(
+        body_xml, match_text, sticker, tape, tape_start, tape_end
+    )
+    if overlap is None:
+        return empty
+    start, end = overlap
+    coverage = _coverage_from_intervals(
+        total,
+        [(start, end)],
+        [
+            {
+                "start": start / total if total else 0.0,
+                "end": end / total if total else 0.0,
+                "covered_chars": end - start,
+                "source": "ai",
+                "preview": preview,
+            }
+        ],
+    )
+    return {"body_xml": final_xml, "coverage": coverage, "applied": True}
+
+
+def _apply_one(body_xml: str, parallel_text: str) -> tuple[str, tuple[int, int] | None, str]:
+    atoms = _iter_xml_atoms(body_xml)
+    tape, _ = _han_tape(atoms)
+    match_text = _normalize_parallel_match_text(parallel_text)
+    sticker = han_only(match_text)
+    overlap = find_han_overlap_flexible(tape, sticker)
+    if overlap is None:
+        return body_xml, None, ""
+
+    tape_start, tape_end = overlap
+    return _apply_parallel_at_range(body_xml, match_text, sticker, tape, tape_start, tape_end)
 
 
 def strip_inline_commentary(parallel_text: str) -> str:
@@ -998,8 +1255,15 @@ def apply_parallel_punctuation(body_xml: str, parallel_text: str) -> ParallelPun
     return apply_parallel_sources(body_xml, [{"id": "paste", "label": "Paste", "text": parallel_text}])
 
 
-def apply_parallel_sources(body_xml: str, sources: list[dict[str, str]]) -> ParallelPunctResult:
+def apply_parallel_sources(
+    body_xml: str,
+    sources: list[dict[str, str]],
+    *,
+    used_chapter_ids: list[str] | None = None,
+) -> ParallelPunctResult:
     """Apply named sources in order. Fail closed per source. Union coverage."""
+    from kanripo_import.wikisource_catalog import resolve_wikisource_parallel
+
     atoms = _iter_xml_atoms(body_xml)
     tape, _ = _han_tape(atoms)
     total = len(tape)
@@ -1007,13 +1271,31 @@ def apply_parallel_sources(body_xml: str, sources: list[dict[str, str]]) -> Para
     intervals: list[tuple[int, int]] = []
     spans: list[CoverageSpan] = []
     applied_any = False
+    matched_chapter_ids: list[str] = []
+    used_chapters = set(str(item) for item in (used_chapter_ids or []))
+    resolved_sources: list[tuple[str, str]] = []
 
     for source in sources:
-        text = str(source.get("text") or "")
+        parallel_text = str(source.get("text") or "")
         label = str(source.get("label") or source.get("id") or "source")
-        if not text.strip():
+        catalog_match = None
+        if source.get("chapters"):
+            parallel_text, catalog_match = resolve_wikisource_parallel(
+                body_xml,
+                source,
+                used_ids=used_chapters,
+            )
+            if catalog_match:
+                matched_chapter_ids.extend(catalog_match["chapter_ids"])
+                if catalog_match["labels"]:
+                    label = (
+                        f"{label}: {', '.join(catalog_match['labels'])} "
+                        f"({catalog_match['method']})"
+                    )
+        if not parallel_text.strip():
             continue
-        xml, overlap, preview = _apply_one(xml, text)
+        resolved_sources.append((label, parallel_text))
+        xml, overlap, preview = _apply_one(xml, parallel_text)
         if overlap is None:
             continue
         start, end = overlap
@@ -1029,8 +1311,152 @@ def apply_parallel_sources(body_xml: str, sources: list[dict[str, str]]) -> Para
             }
         )
 
+    for label, parallel_text in resolved_sources:
+        if not WIKISOURCE_COMM_RE.search(parallel_text):
+            continue
+        comm_result = apply_comm_parallel_punctuation(
+            xml,
+            parallel_text,
+            source_label=f"{label}:comm",
+        )
+        if not comm_result["applied"]:
+            continue
+        xml = comm_result["body_xml"]
+        applied_any = True
+        comm_cov = comm_result["coverage"]
+        for span in comm_cov.get("spans") or []:
+            start = int(float(span["start"]) * total)
+            end = int(float(span["end"]) * total)
+            intervals.append((start, end))
+            spans.append(span)
+
     coverage = _coverage_from_intervals(total, intervals, spans)
-    return {"body_xml": xml, "coverage": coverage, "applied": applied_any}
+    result: ParallelPunctResult = {
+        "body_xml": xml,
+        "coverage": coverage,
+        "applied": applied_any,
+    }
+    if matched_chapter_ids:
+        result["matched_chapter_ids"] = matched_chapter_ids
+    return result
+
+
+def _text_inside_stamps(body_xml: str) -> str:
+    """Concatenate visible text inside ``ljb:parallel-punct`` segs."""
+    parts: list[str] = []
+    stamp_depth = 0
+    other_seg_depth = 0
+    buf: list[str] = []
+    for atom in _iter_xml_atoms(body_xml):
+        prev = stamp_depth
+        stamp_depth, other_seg_depth = _stamp_depth_delta(atom, stamp_depth, other_seg_depth)
+        if stamp_depth > prev:
+            continue
+        if stamp_depth < prev:
+            if prev > 0 and buf:
+                parts.append("".join(buf))
+                buf = []
+            continue
+        if stamp_depth > 0 and not _is_markup(atom):
+            buf.append(atom)
+    if buf:
+        parts.append("".join(buf))
+    return "".join(parts)
+
+
+def _count_han_punct(text: str) -> tuple[int, int]:
+    han = len(HAN_RE.findall(text))
+    punct = sum(1 for ch in text if ch in PUNCT_CHARS)
+    return han, punct
+
+
+def assess_parallel_quality(
+    body_xml: str,
+    coverage: Coverage,
+    *,
+    had_sources: bool = True,
+    source_kinds: list[str] | None = None,
+) -> list[ParallelQualityWarning]:
+    """Heuristic warnings after parallel punctuation (overlap vs punctuation copied)."""
+    warnings: list[ParallelQualityWarning] = []
+    if not had_sources:
+        return warnings
+
+    kinds = [kind for kind in (source_kinds or []) if kind]
+    has_daozang = "daozang" in kinds
+
+    if coverage.get("empty") or float(coverage.get("ratio") or 0) == 0:
+        if has_daozang:
+            warnings.append(
+                {
+                    "code": "daozang_no_align",
+                    "severity": "warning",
+                    "message": (
+                        "Bundled Daozang text did not align with this juan — "
+                        "wrong edition, commentary mismatch, or juan spans only part of the work."
+                    ),
+                }
+            )
+        else:
+            warnings.append(
+                {
+                    "code": "no_overlap",
+                    "severity": "warning",
+                    "message": "Parallel source did not align with this juan (0% overlap).",
+                }
+            )
+        return warnings
+
+    ratio = float(coverage.get("ratio") or 0)
+    pct = int(round(ratio * 100))
+
+    if ratio < LOW_OVERLAP_RATIO:
+        warnings.append(
+            {
+                "code": "low_overlap",
+                "severity": "warning",
+                "message": (
+                    f"Low parallel overlap ({pct}%) — most of this juan stays unpunctuated."
+                ),
+            }
+        )
+
+    stamped = _text_inside_stamps(body_xml)
+    han, punct = _count_han_punct(stamped)
+    if han >= MIN_HAN_FOR_PUNCT_CHECK:
+        per_100 = (punct / han) * 100
+        if per_100 < MIN_PUNCT_PER_100_HAN and ratio >= LOW_OVERLAP_RATIO:
+            warnings.append(
+                {
+                    "code": "low_punctuation",
+                    "severity": "warning",
+                    "message": (
+                        f"Overlap is {pct}% but few punctuation marks were copied "
+                        f"({punct} in {han} characters in matched stretches). "
+                        "The parallel may be unpunctuated or the wrong edition."
+                    ),
+                }
+            )
+    return warnings
+
+
+def enrich_parallel_result(
+    result: dict[str, object],
+    sources: list[dict[str, str]],
+) -> dict[str, object]:
+    kinds = [str(source.get("kind") or "") for source in sources]
+    had_sources = any(str(source.get("text") or "").strip() for source in sources)
+    coverage = result.get("coverage")
+    if not isinstance(coverage, dict):
+        coverage = _empty_coverage(0)
+    warnings = assess_parallel_quality(
+        str(result.get("body_xml") or ""),
+        coverage,  # type: ignore[arg-type]
+        had_sources=had_sources,
+        source_kinds=kinds,
+    )
+    result["quality"] = {"warnings": warnings}
+    return result
 
 
 def assert_well_formed(xml: str) -> None:
