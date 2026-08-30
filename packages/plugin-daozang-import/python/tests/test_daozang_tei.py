@@ -194,6 +194,7 @@ class TestDaozangTei(unittest.TestCase):
         xml = result.get("metadata_xml") or ""
         self.assertIn('person_id="15493"', xml)
         self.assertIn('kr_id="KR5a0092"', xml)
+        self.assertEqual(meta.get("ws_page"), "太上洞玄靈寶無量度人上品妙經註")
 
     @unittest.skipUnless(DAOZHENJI.is_file(), "bundled corpus not built locally")
     def test_daozhenji_corpus_splits(self) -> None:

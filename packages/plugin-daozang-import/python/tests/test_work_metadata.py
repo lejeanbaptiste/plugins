@@ -48,6 +48,41 @@ class TestWorkMetadata(unittest.TestCase):
         self.assertIn("<dyn>元</dyn>", xml)
         self.assertIn("<persName>陳致虛</persName>", xml)
 
+    def test_wikidata_xml_fragment(self):
+        from daozang_import.work_metadata import WikidataMetadata, WorkMetadata
+
+        work = WorkMetadata(
+            rel_path="x.txt",
+            dzid="DZ0001",
+            dz_no="1",
+            title="靈寶無量度人上品妙經",
+            vols="61",
+            kr_id="KR5a0001",
+            krp_title="",
+            edition="正統道藏",
+            variant_class="",
+            source="test",
+            time_dynasty="",
+            date_not_before="",
+            date_not_after="",
+            author_dates="",
+            authorship=(),
+            wikidata=WikidataMetadata(
+                work_qid="Q10286283",
+                edition_qid="Q10286283",
+                wikidata_work_qid="Q10286283",
+                ws_page="靈寶無量度人上品妙經",
+                ws_url="https://zh.wikisource.org/wiki/靈寶無量度人上品妙經",
+                match_tier="confirmed_unique_title",
+                page_exists=True,
+            ),
+        )
+        xml = build_metadata_xml(work)
+        self.assertIn('work_qid="Q10286283"', xml)
+        self.assertIn("<workQid>Q10286283</workQid>", xml)
+        self.assertIn("<wsPage>靈寶無量度人上品妙經</wsPage>", xml)
+        self.assertIn("wikisource.org", xml)
+
     def test_sunzi_eleven_authors(self) -> None:
         rel = "正統道藏太清部-孫子批注-宋-吉天保.txt"
         work = lookup_work_metadata(rel)
@@ -70,6 +105,16 @@ class TestMetadataManifest(unittest.TestCase):
         self.assertGreater(stats["with_kr_id"], 1000)
         self.assertGreater(stats["authorship_with_person_id"], 500)
         self.assertGreaterEqual(stats.get("multi_author_works", 0), 100)
+
+    @unittest.skipUnless(METADATA_JSON.is_file(), "run npm run build:metadata first")
+    def test_wikidata_stats_when_crossref_built(self):
+        manifest = json.loads(
+            (METADATA_JSON.parent / "manifest.json").read_text(encoding="utf-8")
+        )
+        stats = manifest["stats"]
+        if "with_wikisource_page" not in stats:
+            self.skipTest("rebuild metadata after adding Wikisource crossref")
+        self.assertGreater(stats["with_wikisource_page"], 1000)
 
 
 if __name__ == "__main__":

@@ -14,11 +14,15 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import os
 import re
 import shutil
 from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
+from urllib.parse import quote
+
+from wikidata_pack_index import enrich_from_pack, load_works_by_qid
 
 _DATES_RE = re.compile(r"^\s*(-?\d+)\s*-\s*(-?\d+)\s*$")
 _EXTENT_RE = re.compile(r"(\d+)")
@@ -119,6 +123,119 @@ def _load_normalized_hints(path: Path) -> tuple[dict[str, dict], dict[tuple[str,
     return by_dzid, by_author
 
 
+def _default_wikidata_pack_path() -> Path | None:
+    """Locate work-zh-hant authority pack when building inside the LJB monorepo."""
+    root = _plugin_root()
+    candidates = [
+        root.parents[2] / "authoritypacks" / "packs" / "wikidata" / "work-zh-hant" / "works.ndjson",
+        root.parents[3] / "authoritypacks" / "packs" / "wikidata" / "work-zh-hant" / "works.ndjson",
+    ]
+    env = os.environ.get("LJB_WIKIDATA_WORK_PACK", "").strip()
+    if env:
+        candidates.insert(0, Path(env))
+    for path in candidates:
+        if path.is_file():
+            return path
+    return None
+
+
+def _ws_page_url(page: str) -> str:
+    title = (page or "").strip().replace(" ", "_")
+    return f"https://zh.wikisource.org/wiki/{quote(title, safe='')}"
+
+
+def _load_krp_wikidata_qids(path: Path) -> dict[str, dict[str, str]]:
+    if not path.is_file():
+        return {}
+    doc = json.loads(path.read_text(encoding="utf-8"))
+    by_kr = doc.get("by_kr_id") or doc
+    if not isinstance(by_kr, dict):
+        return {}
+    out: dict[str, dict[str, str]] = {}
+    for kr_id, row in by_kr.items():
+        if isinstance(row, dict):
+            out[str(kr_id).strip()] = row
+    return out
+
+
+def _merge_wikidata_crossref(
+    entries: dict[str, dict],
+    *,
+    qids_by_kr: dict[str, dict[str, str]],
+    pack_by_qid: dict[str, dict],
+) -> int:
+    merged = 0
+    for kr_id, qrow in qids_by_kr.items():
+        entry = entries.get(kr_id)
+        if not entry:
+            continue
+        work_qid = (qrow.get("work_qid") or "").strip()
+        edition_qid = (qrow.get("edition_qid") or "").strip()
+        ws_page = (qrow.get("ws_page") or "").strip()
+        wd = {
+            "work_qid": work_qid,
+            "edition_qid": edition_qid,
+            "wikidata_work_qid": (qrow.get("wikidata_work_qid") or work_qid or edition_qid).strip(),
+            "ws_page": ws_page,
+            "ws_url": _ws_page_url(ws_page) if ws_page else "",
+            "match_tier": (qrow.get("match_tier") or "").strip(),
+            "corpus_title": (qrow.get("corpus_title") or "").strip(),
+        }
+        pack_row = pack_by_qid.get(work_qid) or pack_by_qid.get(edition_qid)
+        if pack_row:
+            enrich_from_pack(entry, pack_row=pack_row)
+            meta = pack_row.get("metadata") or {}
+            if pack_row.get("primaryName"):
+                wd["primary_name"] = pack_row["primaryName"]
+            if pack_row.get("searchStrings"):
+                wd["aliases"] = list(pack_row["searchStrings"])
+            if meta.get("startYear") is not None:
+                wd["start_year"] = meta["startYear"]
+            if meta.get("endYear") is not None:
+                wd["end_year"] = meta["endYear"]
+            if meta.get("description"):
+                wd["description"] = meta["description"]
+        entry["wikidata"] = wd
+        merged += 1
+    return merged
+
+
+def _extract_wikidata_sidecar(entries: dict[str, dict]) -> dict[str, dict]:
+    """Move wikidata blocks out of work entries into a separate runtime lookup."""
+    sidecar: dict[str, dict] = {}
+    for kr_id, entry in entries.items():
+        wd = entry.pop("wikidata", None)
+        if isinstance(wd, dict) and wd.get("wikidata_work_qid"):
+            sidecar[kr_id] = wd
+    return sidecar
+
+
+def _build_parallel_sources(
+    entries: dict[str, dict],
+    *,
+    daozang_map: dict[str, dict],
+) -> dict[str, dict]:
+    """KRP → bundled Daozang punctuation paths only (Wikisource comes from wikidata sidecar at runtime)."""
+    out: dict[str, dict] = {}
+    for kr_id, entry in entries.items():
+        dz = daozang_map.get(kr_id) or {}
+        rel = (dz.get("daozang_rel_path") or "").strip()
+        if not rel:
+            continue
+        out[kr_id] = {
+            "kr_id": kr_id,
+            "sources": [
+                {
+                    "kind": "daozang",
+                    "label": (dz.get("daozang_title") or dz.get("title") or rel).strip(),
+                    "rel_path": rel,
+                    "dz_id": (dz.get("dz_id") or entry.get("dzid") or "").strip(),
+                }
+            ],
+        }
+    return out
+
+
 def sync_sources(*, metadata_root: Path, sources: Path) -> None:
     tables = metadata_root / "tables_output"
     copies = {
@@ -139,6 +256,10 @@ def sync_sources(*, metadata_root: Path, sources: Path) -> None:
     if norm_src.is_file():
         shutil.copy2(norm_src, sources / "DZ_metadata_normalized.csv")
         print(f"Synced {_rel_source(sources / 'DZ_metadata_normalized.csv')}")
+    qid_src = metadata_root / "tables_output" / "wikidata_explore" / "krp_wikidata_qids.json"
+    if qid_src.is_file():
+        shutil.copy2(qid_src, sources / "krp_wikidata_qids.json")
+        print(f"Synced {_rel_source(sources / 'krp_wikidata_qids.json')}")
 
 
 def _load_org_by_kr(rows: list[dict[str, str]]) -> dict[str, dict[str, str]]:
@@ -360,6 +481,12 @@ def main() -> None:
         metavar="METADATA_ROOT",
         help="Copy tables from chinese_corpus_metadata before build (maintainers only)",
     )
+    parser.add_argument(
+        "--wikidata-pack",
+        type=Path,
+        default=None,
+        help="Path to wikidata/work-zh-hant/works.ndjson (optional enrichment)",
+    )
     parser.add_argument("--out-dir", type=Path, default=_plugin_root() / "data" / "metadata")
     args = parser.parse_args()
 
@@ -400,6 +527,40 @@ def main() -> None:
         norm_by_dzid=norm_by_dzid,
     )
 
+    qids_path = args.sources_dir / "krp_wikidata_qids.json"
+    qids_by_kr = _load_krp_wikidata_qids(qids_path)
+    pack_path = args.wikidata_pack or _default_wikidata_pack_path()
+    wanted_qids: set[str] = set()
+    for row in qids_by_kr.values():
+        for key in ("work_qid", "edition_qid", "wikidata_work_qid"):
+            q = (row.get(key) or "").strip()
+            if q:
+                wanted_qids.add(q)
+    pack_by_qid = load_works_by_qid(pack_path, wanted_qids=wanted_qids) if pack_path else {}
+    wd_merged = _merge_wikidata_crossref(entries, qids_by_kr=qids_by_kr, pack_by_qid=pack_by_qid)
+    if pack_path:
+        print(f"Wikidata authority pack: {_rel_source(pack_path)} ({len(pack_by_qid)} Q-ids loaded)")
+    else:
+        print("Wikidata authority pack: not found (skip --wikidata-pack or set LJB_WIKIDATA_WORK_PACK)")
+
+    daozang_map_path = _concordance_dir() / "kanripo_daozang_map.json"
+    daozang_raw: dict[str, dict] = {}
+    if daozang_map_path.is_file():
+        daozang_raw = json.loads(daozang_map_path.read_text(encoding="utf-8")).get("entries") or {}
+    parallel_sources = _build_parallel_sources(entries, daozang_map=daozang_raw)
+    concordance_out = _concordance_dir() / "krp_parallel_sources.json"
+    concordance_out.parent.mkdir(parents=True, exist_ok=True)
+    parallel_payload = {
+        "version": 1,
+        "generatedAt": datetime.now(timezone.utc).replace(microsecond=0).isoformat(),
+        "entryCount": len(parallel_sources),
+        "entries": parallel_sources,
+    }
+    concordance_out.write_text(
+        json.dumps(parallel_payload, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+
     out = args.out_dir
     out.mkdir(parents=True, exist_ok=True)
     generated_at = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
@@ -419,6 +580,14 @@ def main() -> None:
         for a in e.get("authorship") or []
         if a.get("person_id")
     )
+    with_wd = sum(1 for e in entries.values() if (e.get("wikidata") or {}).get("wikidata_work_qid"))
+    with_wd_primary = sum(1 for e in entries.values() if (e.get("wikidata") or {}).get("primary_name"))
+    with_wd_aliases = sum(
+        1 for e in entries.values() if (e.get("wikidata") or {}).get("aliases")
+    )
+    with_wd_desc = sum(1 for e in entries.values() if (e.get("wikidata") or {}).get("description"))
+
+    wikidata_by_kr = _extract_wikidata_sidecar(entries)
 
     payload = {
         "version": 1,
@@ -434,11 +603,24 @@ def main() -> None:
             else None,
             "kanripo_org_concordance": _rel_source(org_csv),
             "krp_dz_collation": _rel_source(dz_collation_csv),
+            "krp_wikidata_qids": _rel_source(qids_path) if qids_path.is_file() else None,
+            "wikidata_work_pack": str(pack_path) if pack_path else None,
         },
         "entries": entries,
     }
     (out / "krp_works_by_id.json").write_text(
         json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+
+    wikidata_payload = {
+        "version": 1,
+        "generatedAt": generated_at,
+        "entryCount": len(wikidata_by_kr),
+        "entries": wikidata_by_kr,
+    }
+    (out / "krp_wikidata_by_kr_id.json").write_text(
+        json.dumps(wikidata_payload, ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8",
     )
 
@@ -453,6 +635,18 @@ def main() -> None:
             "with_time_dynasty": with_dynasty,
             "with_author_dates": with_dates,
             "authorship_with_person_id": with_pid,
+            "with_wikidata_qid": with_wd,
+            "wikidata_crossref_merged": wd_merged,
+            "wikidata_pack_qids_loaded": len(pack_by_qid),
+            "wikidata_with_primary_name": with_wd_primary,
+            "wikidata_with_aliases": with_wd_aliases,
+            "wikidata_with_description": with_wd_desc,
+            "parallel_daozang_bundled": len(parallel_sources),
+            "parallel_wikisource_from_wikidata": sum(
+                1
+                for wd in wikidata_by_kr.values()
+                if (wd.get("ws_url") or "").strip() and (wd.get("ws_page") or "").strip()
+            ),
         },
     }
     (out / "manifest.json").write_text(
@@ -462,7 +656,11 @@ def main() -> None:
     print(f"Wrote {len(entries)} work metadata entries to {out}")
     print(
         f"  with DZID: {with_dz}; multi-author: {multi_auth}; "
-        f"dynasty: {with_dynasty}; person_id rows: {with_pid}"
+        f"dynasty: {with_dynasty}; person_id rows: {with_pid}; "
+        f"wikidata Q-id: {with_wd}; pack enriched: primary={with_wd_primary}, "
+        f"aliases={with_wd_aliases}, description={with_wd_desc}; "
+        f"parallel: daozang bundled={len(parallel_sources)}, "
+        f"wikisource via wikidata={sum(1 for wd in wikidata_by_kr.values() if (wd.get('ws_url') or '').strip())}"
     )
 
 

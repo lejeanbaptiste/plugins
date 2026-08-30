@@ -266,6 +266,17 @@ def convert_kanripo_txt(
         )
         entities = work_metadata_to_dict(work)
         meta["authorship"] = entities.get("authorship", [])
+        if work.wikidata:
+            meta.update(
+                {
+                    "work_qid": work.wikidata.wikidata_work_qid,
+                    "edition_qid": work.wikidata.edition_qid,
+                    "ws_page": work.wikidata.ws_page,
+                    "ws_url": work.wikidata.ws_url,
+                    "wikidata_primary_name": work.wikidata.primary_name,
+                    "wikidata_aliases": list(work.wikidata.aliases),
+                }
+            )
         metadata_xml = build_metadata_xml(work, juan=str(juan))
 
     return {

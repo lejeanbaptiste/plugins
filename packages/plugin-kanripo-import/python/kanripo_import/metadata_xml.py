@@ -61,6 +61,16 @@ def build_metadata_xml(work: WorkMetadata, *, juan: str = "") -> str:
             _attr("juan", juan),
         ]
     )
+    if work.wikidata:
+        wd = work.wikidata
+        citation_attrs += "".join(
+            [
+                _attr("work_qid", wd.work_qid),
+                _attr("edition_qid", wd.edition_qid),
+                _attr("wikidata_work_qid", wd.wikidata_work_qid),
+                _attr("ws_page", wd.ws_page),
+            ]
+        )
     vols = work.vols or work.juan_count
     vols_attrs = _attr("n", vols)
     authorship_blocks = "\n".join(_authorship_xml(a) for a in work.authorship)
@@ -79,11 +89,41 @@ def build_metadata_xml(work: WorkMetadata, *, juan: str = "") -> str:
     parts.append("  </work>")
     if date_block:
         parts.append(date_block)
+    if work.wikidata and work.wikidata.wikidata_work_qid:
+        wd = work.wikidata
+        parts.append("  <wikidata>")
+        parts.append(f"    <workQid>{_esc(wd.wikidata_work_qid)}</workQid>")
+        if wd.edition_qid:
+            parts.append(f"    <editionQid>{_esc(wd.edition_qid)}</editionQid>")
+        if wd.ws_page:
+            parts.append(f"    <wsPage>{_esc(wd.ws_page)}</wsPage>")
+        if wd.ws_url:
+            parts.append(f"    <wsUrl>{_esc(wd.ws_url)}</wsUrl>")
+        if wd.primary_name:
+            parts.append(f"    <primaryName>{_esc(wd.primary_name)}</primaryName>")
+        for alias in wd.aliases[:12]:
+            parts.append(f"    <alias>{_esc(alias)}</alias>")
+        parts.append("  </wikidata>")
     parts.append("</metadata>")
     return "\n".join(parts)
 
 
 def work_metadata_to_dict(work: WorkMetadata) -> dict[str, object]:
+    wd: dict[str, object] | None = None
+    if work.wikidata:
+        wd = {
+            "work_qid": work.wikidata.work_qid,
+            "edition_qid": work.wikidata.edition_qid,
+            "wikidata_work_qid": work.wikidata.wikidata_work_qid,
+            "ws_page": work.wikidata.ws_page,
+            "ws_url": work.wikidata.ws_url,
+            "match_tier": work.wikidata.match_tier,
+            "primary_name": work.wikidata.primary_name,
+            "aliases": list(work.wikidata.aliases),
+            "description": work.wikidata.description,
+            "start_year": work.wikidata.start_year,
+            "end_year": work.wikidata.end_year,
+        }
     return {
         "kr_id": work.kr_id,
         "title": work.title,
@@ -96,6 +136,7 @@ def work_metadata_to_dict(work: WorkMetadata) -> dict[str, object]:
         "date_not_before": work.date_not_before,
         "date_not_after": work.date_not_after,
         "author_dates": work.author_dates,
+        "wikidata": wd,
         "authorship": [
             {
                 "author_index": a.author_index,

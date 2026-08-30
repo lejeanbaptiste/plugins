@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-08-29T18:21:20+00:00",
+  "generatedAt": "2026-08-30T08:21:19+00:00",
   "entryCount": 9336,
   "sources": {
     "krp_works": "data/metadata/sources/krp_works.csv",
@@ -9,7 +9,9 @@
     "dz_metadata_authors": "data/metadata/sources/dz_metadata_authors.csv",
     "dz_metadata_normalized": "data/metadata/sources/DZ_metadata_normalized.csv",
     "kanripo_org_concordance": "data/concordance/kanripo_org_concordance.csv",
-    "krp_dz_collation": "data/concordance/krp_dz_collation.csv"
+    "krp_dz_collation": "data/concordance/krp_dz_collation.csv",
+    "krp_wikidata_qids": "data/metadata/sources/krp_wikidata_qids.json",
+    "wikidata_work_pack": "/home/d/Python/ljb/authoritypacks/packs/wikidata/work-zh-hant/works.ndjson"
   },
   "entries": {
     "KR1a0001": {
@@ -8091,9 +8093,9 @@
       "cbeta_id": "",
       "dzid": "",
       "time_dynasty": "宋",
-      "date_not_before": "",
+      "date_not_before": "1053",
       "date_not_after": "",
-      "author_dates": "",
+      "author_dates": "1053",
       "authorship": [
         {
           "author_index": "1",
@@ -8130,9 +8132,9 @@
       "cbeta_id": "",
       "dzid": "",
       "time_dynasty": "宋",
-      "date_not_before": "",
+      "date_not_before": "1101",
       "date_not_after": "",
-      "author_dates": "",
+      "author_dates": "1101",
       "authorship": [
         {
           "author_index": "1",
@@ -17432,9 +17434,9 @@
       "cbeta_id": "",
       "dzid": "",
       "time_dynasty": "宋",
-      "date_not_before": "",
+      "date_not_before": "1200",
       "date_not_after": "",
-      "author_dates": "",
+      "author_dates": "1200",
       "authorship": [
         {
           "author_index": "1",
@@ -19832,9 +19834,9 @@
       "cbeta_id": "",
       "dzid": "",
       "time_dynasty": "",
-      "date_not_before": "",
+      "date_not_before": "1377",
       "date_not_after": "",
-      "author_dates": "",
+      "author_dates": "1377",
       "authorship": [
         {
           "author_index": "1",
@@ -21080,7 +21082,7 @@
       "cbeta_id": "",
       "dzid": "",
       "time_dynasty": "清",
-      "date_not_before": "",
+      "date_not_before": "1782",
       "date_not_after": "",
       "author_dates": "d. 1770",
       "authorship": [
@@ -24273,7 +24275,7 @@
       "cbeta_id": "",
       "dzid": "",
       "time_dynasty": "南朝宋",
-      "date_not_before": "",
+      "date_not_before": "414",
       "date_not_after": "",
       "author_dates": "fl. 399 - 414",
       "authorship": [
@@ -24370,7 +24372,7 @@
       "cbeta_id": "",
       "dzid": "",
       "time_dynasty": "宋",
-      "date_not_before": "",
+      "date_not_before": "1225",
       "date_not_after": "",
       "author_dates": "13th cent",
       "authorship": [
@@ -24670,7 +24672,7 @@
       "cbeta_id": "",
       "dzid": "",
       "time_dynasty": "清",
-      "date_not_before": "",
+      "date_not_before": "1769",
       "date_not_after": "",
       "author_dates": "d. 1770",
       "authorship": [
@@ -25715,7 +25717,7 @@
       "cbeta_id": "",
       "dzid": "",
       "time_dynasty": "元",
-      "date_not_before": "",
+      "date_not_before": "1307",
       "date_not_after": "",
       "author_dates": "fl. 1254 - 1322",
       "authorship": [
@@ -34174,7 +34176,7 @@
       "cbeta_id": "",
       "dzid": "",
       "time_dynasty": "元",
-      "date_not_before": "",
+      "date_not_before": "-300",
       "date_not_after": "",
       "author_dates": "d. -233",
       "authorship": [
@@ -37846,9 +37848,9 @@
       "cbeta_id": "",
       "dzid": "",
       "time_dynasty": "唐",
-      "date_not_before": "",
+      "date_not_before": "-651",
       "date_not_after": "",
-      "author_dates": "",
+      "author_dates": "-651",
       "authorship": [
         {
           "author_index": "1",
@@ -39186,7 +39188,7 @@
       "cbeta_id": "",
       "dzid": "",
       "time_dynasty": "宋",
-      "date_not_before": "",
+      "date_not_before": "1247",
       "date_not_after": "",
       "author_dates": "fl. 1247",
       "authorship": [
@@ -51236,7 +51238,7 @@
       "cbeta_id": "",
       "dzid": "",
       "time_dynasty": "宋",
-      "date_not_before": "",
+      "date_not_before": "1013",
       "date_not_after": "",
       "author_dates": "d. 1025",
       "authorship": [
@@ -56512,7 +56514,7 @@
       "cbeta_id": "",
       "dzid": "",
       "time_dynasty": "唐",
-      "date_not_before": "",
+      "date_not_before": "900",
       "date_not_after": "",
       "author_dates": "fl. 843",
       "authorship": [
@@ -91221,9 +91223,9 @@
       "cbeta_id": "",
       "dzid": "",
       "time_dynasty": "元",
-      "date_not_before": "",
+      "date_not_before": "1344",
       "date_not_after": "",
-      "author_dates": "",
+      "author_dates": "1344",
       "authorship": [
         {
           "author_index": "1",
@@ -119595,9 +119597,9 @@
       "cbeta_id": "",
       "dzid": "DZ0734",
       "time_dynasty": "宋",
-      "date_not_before": "",
+      "date_not_before": "1270",
       "date_not_after": "",
-      "author_dates": "",
+      "author_dates": "1270",
       "authorship": [
         {
           "author_index": "1",
@@ -127022,9 +127024,9 @@
       "cbeta_id": "",
       "dzid": "DZ1028",
       "time_dynasty": "唐",
-      "date_not_before": "",
+      "date_not_before": "887",
       "date_not_after": "",
-      "author_dates": "",
+      "author_dates": "887",
       "authorship": [
         {
           "author_index": "1",

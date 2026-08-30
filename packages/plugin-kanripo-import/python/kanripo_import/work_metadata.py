@@ -14,6 +14,21 @@ _KR_ID_RE = re.compile(r"^KR[a-z0-9]+$", re.IGNORECASE)
 
 
 @dataclass(frozen=True)
+class WikidataMetadata:
+    work_qid: str
+    edition_qid: str
+    wikidata_work_qid: str
+    ws_page: str
+    ws_url: str
+    match_tier: str
+    primary_name: str
+    aliases: tuple[str, ...]
+    description: str
+    start_year: str
+    end_year: str
+
+
+@dataclass(frozen=True)
 class AuthorshipRecord:
     author_index: str
     person_name: str
@@ -39,6 +54,34 @@ class WorkMetadata:
     date_not_after: str
     author_dates: str
     authorship: tuple[AuthorshipRecord, ...]
+    wikidata: WikidataMetadata | None
+
+
+def _parse_wikidata(raw: dict[str, Any] | None) -> WikidataMetadata | None:
+    if not raw or not isinstance(raw, dict):
+        return None
+    work_qid = (raw.get("work_qid") or "").strip()
+    edition_qid = (raw.get("edition_qid") or "").strip()
+    primary = (raw.get("wikidata_work_qid") or work_qid or edition_qid).strip()
+    if not primary and not (raw.get("ws_page") or "").strip():
+        return None
+    aliases_raw = raw.get("aliases") or []
+    aliases = tuple(str(a).strip() for a in aliases_raw if str(a).strip())
+    start = raw.get("start_year")
+    end = raw.get("end_year")
+    return WikidataMetadata(
+        work_qid=work_qid,
+        edition_qid=edition_qid,
+        wikidata_work_qid=primary,
+        ws_page=(raw.get("ws_page") or "").strip(),
+        ws_url=(raw.get("ws_url") or "").strip(),
+        match_tier=(raw.get("match_tier") or "").strip(),
+        primary_name=(raw.get("primary_name") or "").strip(),
+        aliases=aliases,
+        description=(raw.get("description") or "").strip(),
+        start_year="" if start is None else str(start),
+        end_year="" if end is None else str(end),
+    )
 
 
 def _parse_authorship(raw: list[dict[str, str]] | None) -> tuple[AuthorshipRecord, ...]:
@@ -59,9 +102,38 @@ def _parse_authorship(raw: list[dict[str, str]] | None) -> tuple[AuthorshipRecor
     return tuple(out)
 
 
-def _record_from_raw(row: dict[str, Any]) -> WorkMetadata:
+@lru_cache(maxsize=1)
+def _load_wikidata_doc() -> dict[str, Any]:
+    path = metadata_dir() / "krp_wikidata_by_kr_id.json"
+    if path.is_file():
+        return json.loads(path.read_text(encoding="utf-8"))
+    return {"entries": {}}
+
+
+@lru_cache(maxsize=1)
+def _load_wikidata_index() -> dict[str, dict[str, Any]]:
+    entries = _load_wikidata_doc().get("entries") or {}
+    out: dict[str, dict[str, Any]] = {}
+    for kr_id, raw in entries.items():
+        if isinstance(raw, dict):
+            key = _normalize_kr_id(str(kr_id))
+            if key:
+                out[key] = raw
+    return out
+
+
+def _wikidata_raw_for_record(row: dict[str, Any], kr_id: str) -> dict[str, Any] | None:
+    sidecar = _load_wikidata_index().get(kr_id)
+    if sidecar:
+        return sidecar
+    embedded = row.get("wikidata")
+    return embedded if isinstance(embedded, dict) else None
+
+
+def _record_from_raw(row: dict[str, Any], *, kr_id: str = "") -> WorkMetadata:
+    key = _normalize_kr_id(kr_id or str(row.get("kr_id") or row.get("KR_ID") or ""))
     return WorkMetadata(
-        kr_id=(row.get("kr_id") or row.get("KR_ID") or "").strip(),
+        kr_id=key,
         title=(row.get("title") or row.get("text_title") or "").strip(),
         vols=(row.get("vols") or "").strip(),
         juan_count=(row.get("juan_count") or row.get("files") or "").strip(),
@@ -73,6 +145,7 @@ def _record_from_raw(row: dict[str, Any]) -> WorkMetadata:
         date_not_after=(row.get("date_not_after") or "").strip(),
         author_dates=(row.get("author_dates") or "").strip(),
         authorship=_parse_authorship(row.get("authorship")),
+        wikidata=_parse_wikidata(_wikidata_raw_for_record(row, key)),
     )
 
 
@@ -99,7 +172,7 @@ def load_work_metadata_index() -> dict[str, WorkMetadata]:
         if isinstance(raw, dict):
             key = _normalize_kr_id(str(kr_id))
             if key:
-                out[key] = _record_from_raw(raw)
+                out[key] = _record_from_raw(raw, kr_id=key)
     return out
 
 
@@ -112,4 +185,6 @@ def lookup_work_metadata(kr_id: str) -> WorkMetadata | None:
 
 def clear_work_metadata_cache() -> None:
     _load_doc.cache_clear()
+    _load_wikidata_doc.cache_clear()
+    _load_wikidata_index.cache_clear()
     load_work_metadata_index.cache_clear()

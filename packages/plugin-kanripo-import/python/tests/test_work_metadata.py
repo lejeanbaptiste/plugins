@@ -35,6 +35,26 @@ class TestKanripoWorkMetadata(unittest.TestCase):
         self.assertEqual(work.authorship[0].person_name, "程迥")
         self.assertEqual(work.authorship[0].person_id, "")
 
+    def test_wikidata_sidecar(self) -> None:
+        work = lookup_work_metadata("KR1a0030")
+        assert work is not None
+        self.assertIsNotNone(work.wikidata)
+        assert work.wikidata is not None
+        self.assertEqual(work.wikidata.wikidata_work_qid, "Q99692775")
+        self.assertTrue(work.wikidata.ws_url.startswith("https://zh.wikisource.org/"))
+        sidecar = (
+            Path(__file__).resolve().parents[2]
+            / "data"
+            / "metadata"
+            / "krp_wikidata_by_kr_id.json"
+        )
+        if sidecar.is_file():
+            doc = json.loads(sidecar.read_text(encoding="utf-8"))
+            self.assertIn("KR1a0030", doc.get("entries") or {})
+            works_doc = json.loads(METADATA_JSON.read_text(encoding="utf-8"))
+            embedded = (works_doc.get("entries") or {}).get("KR1a0030") or {}
+            self.assertNotIn("wikidata", embedded)
+
     def test_bu_shang_dates_and_vols(self) -> None:
         work = lookup_work_metadata("KR1a0002")
         assert work is not None

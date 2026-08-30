@@ -14,6 +14,17 @@ _DYNASTY_AUTHOR_RE = re.compile(r"-([^-]+)-([^-]+)\.txt$", re.UNICODE)
 
 
 @dataclass(frozen=True)
+class WikidataMetadata:
+    work_qid: str
+    edition_qid: str
+    wikidata_work_qid: str
+    ws_page: str
+    ws_url: str
+    match_tier: str
+    page_exists: bool
+
+
+@dataclass(frozen=True)
 class AuthorshipRecord:
     author_index: str
     person_name: str
@@ -42,6 +53,32 @@ class WorkMetadata:
     date_not_after: str
     author_dates: str
     authorship: tuple[AuthorshipRecord, ...]
+    wikidata: WikidataMetadata | None
+
+
+def _parse_wikidata(raw: dict[str, Any] | None) -> WikidataMetadata | None:
+    if not raw or not isinstance(raw, dict):
+        return None
+    work_qid = (raw.get("work_qid") or "").strip()
+    edition_qid = (raw.get("edition_qid") or "").strip()
+    primary = (raw.get("wikidata_work_qid") or work_qid or edition_qid).strip()
+    ws_page = (raw.get("ws_page") or "").strip()
+    if not primary and not ws_page:
+        return None
+    exists = raw.get("page_exists")
+    if isinstance(exists, bool):
+        page_exists = exists
+    else:
+        page_exists = str(exists or "").strip().lower() in {"1", "true", "yes"}
+    return WikidataMetadata(
+        work_qid=work_qid or primary,
+        edition_qid=edition_qid,
+        wikidata_work_qid=primary,
+        ws_page=ws_page,
+        ws_url=(raw.get("ws_url") or "").strip(),
+        match_tier=(raw.get("match_tier") or "").strip(),
+        page_exists=page_exists,
+    )
 
 
 def _parse_authorship(raw: list[dict[str, str]] | None) -> tuple[AuthorshipRecord, ...]:
@@ -79,6 +116,7 @@ def _record_from_raw(row: dict[str, Any]) -> WorkMetadata:
         date_not_after=(row.get("date_not_after") or "").strip(),
         author_dates=(row.get("author_dates") or "").strip(),
         authorship=_parse_authorship(row.get("authorship")),
+        wikidata=_parse_wikidata(row.get("wikidata")),
     )
 
 

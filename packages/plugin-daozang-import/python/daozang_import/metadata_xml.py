@@ -61,6 +61,16 @@ def build_metadata_xml(work: WorkMetadata) -> str:
             _attr("title", work.title),
         ]
     )
+    if work.wikidata:
+        wd = work.wikidata
+        citation_attrs += "".join(
+            [
+                _attr("work_qid", wd.work_qid),
+                _attr("edition_qid", wd.edition_qid),
+                _attr("wikidata_work_qid", wd.wikidata_work_qid),
+                _attr("ws_page", wd.ws_page),
+            ]
+        )
     vols_attrs = "".join([_attr("n", work.vols), _attr("type", "")])
     authorship_blocks = "\n".join(_authorship_xml(a) for a in work.authorship)
     date_block = _date_xml(work)
@@ -78,11 +88,36 @@ def build_metadata_xml(work: WorkMetadata) -> str:
     parts.append("  </work>")
     if date_block:
         parts.append(date_block)
+    if work.wikidata and (work.wikidata.wikidata_work_qid or work.wikidata.ws_page):
+        wd = work.wikidata
+        parts.append("  <wikidata>")
+        if wd.wikidata_work_qid:
+            parts.append(f"    <workQid>{_esc(wd.wikidata_work_qid)}</workQid>")
+        if wd.edition_qid:
+            parts.append(f"    <editionQid>{_esc(wd.edition_qid)}</editionQid>")
+        if wd.ws_page:
+            parts.append(f"    <wsPage>{_esc(wd.ws_page)}</wsPage>")
+        if wd.ws_url:
+            parts.append(f"    <wsUrl>{_esc(wd.ws_url)}</wsUrl>")
+        if wd.match_tier:
+            parts.append(f"    <matchTier>{_esc(wd.match_tier)}</matchTier>")
+        parts.append("  </wikidata>")
     parts.append("</metadata>")
     return "\n".join(parts)
 
 
 def work_metadata_to_dict(work: WorkMetadata) -> dict[str, object]:
+    wd: dict[str, object] | None = None
+    if work.wikidata:
+        wd = {
+            "work_qid": work.wikidata.work_qid,
+            "edition_qid": work.wikidata.edition_qid,
+            "wikidata_work_qid": work.wikidata.wikidata_work_qid,
+            "ws_page": work.wikidata.ws_page,
+            "ws_url": work.wikidata.ws_url,
+            "match_tier": work.wikidata.match_tier,
+            "page_exists": work.wikidata.page_exists,
+        }
     return {
         "rel_path": work.rel_path,
         "dzid": work.dzid,
@@ -98,6 +133,7 @@ def work_metadata_to_dict(work: WorkMetadata) -> dict[str, object]:
         "date_not_before": work.date_not_before,
         "date_not_after": work.date_not_after,
         "author_dates": work.author_dates,
+        "wikidata": wd,
         "authorship": [
             {
                 "author_index": a.author_index,

@@ -23,6 +23,7 @@ import shutil
 from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
+from urllib.parse import quote
 
 _DYNASTY_AUTHOR_RE = re.compile(r"-([^-]+)-([^-]+)\.txt$", re.UNICODE)
 
@@ -129,6 +130,12 @@ def sync_sources(
     if normalized_csv and normalized_csv.is_file():
         shutil.copy2(normalized_csv, sources / "DZ_metadata_normalized.csv")
         print(f"Synced {_rel_source(sources / 'DZ_metadata_normalized.csv')}")
+    qid_src = metadata_root / "tables_output" / "wikidata_explore" / "dz_wikidata_qids.json"
+    if qid_src.is_file():
+        shutil.copy2(qid_src, sources / "dz_wikidata_qids.json")
+        print(f"Synced {_rel_source(sources / 'dz_wikidata_qids.json')}")
+    else:
+        print("Note: dz_wikidata_qids.json not found upstream (run export_dz_wikidata_qids.py)")
 
 
 def build_entries(
@@ -210,6 +217,62 @@ def build_entries(
     return out
 
 
+def _ws_page_url(page: str) -> str:
+    title = (page or "").strip().replace(" ", "_")
+    return f"https://zh.wikisource.org/wiki/{quote(title, safe='')}"
+
+
+def _truthy(value: str) -> bool:
+    return (value or "").strip().lower() in {"1", "true", "yes"}
+
+
+def _load_dz_wikidata_qids(path: Path) -> dict[str, dict[str, str]]:
+    if not path.is_file():
+        return {}
+    doc = json.loads(path.read_text(encoding="utf-8"))
+    by_dz = doc.get("by_dzid") or {}
+    if not isinstance(by_dz, dict):
+        return {}
+    out: dict[str, dict[str, str]] = {}
+    for dzid, row in by_dz.items():
+        if isinstance(row, dict):
+            out[str(dzid).strip().upper()] = row
+    return out
+
+
+def _merge_wikidata_crossref(
+    entries: dict[str, dict],
+    *,
+    qids_by_dz: dict[str, dict[str, str]],
+) -> int:
+    """Attach Wikisource/Wikidata ids by DZID. Does not overwrite catalogue fields."""
+    merged = 0
+    for entry in entries.values():
+        dzid = _dzid_norm(entry.get("dzid") or "")
+        qrow = qids_by_dz.get(dzid)
+        if not qrow:
+            continue
+        ws_page = (qrow.get("ws_page") or "").strip()
+        work_qid = (qrow.get("work_qid") or "").strip()
+        edition_qid = (qrow.get("edition_qid") or "").strip()
+        primary = (qrow.get("wikidata_work_qid") or work_qid or edition_qid).strip()
+        page_exists = _truthy(qrow.get("page_exists") or "")
+        if not ws_page and not primary:
+            continue
+        entry["wikidata"] = {
+            "work_qid": work_qid or primary,
+            "edition_qid": edition_qid,
+            "wikidata_work_qid": primary,
+            "ws_page": ws_page,
+            "ws_url": _ws_page_url(ws_page) if ws_page and page_exists else "",
+            "page_exists": page_exists,
+            "match_tier": (qrow.get("match_tier") or "").strip(),
+            "corpus_title": (qrow.get("corpus_title") or "").strip(),
+        }
+        merged += 1
+    return merged
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -259,6 +322,8 @@ def main() -> None:
         norm_by_dzid=norm_by_dzid,
         norm_by_author=norm_by_author,
     )
+    qids_path = args.sources_dir / "dz_wikidata_qids.json"
+    wd_merged = _merge_wikidata_crossref(entries, qids_by_dz=_load_dz_wikidata_qids(qids_path))
 
     out = args.out_dir
     out.mkdir(parents=True, exist_ok=True)
@@ -285,6 +350,7 @@ def main() -> None:
             "dz_metadata_normalized": _rel_source(normalized_csv)
             if normalized_csv.is_file()
             else None,
+            "dz_wikidata_qids": _rel_source(qids_path) if qids_path.is_file() else None,
         },
         "entries": entries,
     }
@@ -303,6 +369,18 @@ def main() -> None:
             "multi_author_works": multi_auth,
             "authorship_with_person_id": with_pid,
             "with_time_dynasty": sum(1 for e in entries.values() if e.get("time_dynasty")),
+            "with_wikidata_qid": sum(
+                1
+                for e in entries.values()
+                if (e.get("wikidata") or {}).get("wikidata_work_qid")
+            ),
+            "with_wikisource_page": sum(
+                1 for e in entries.values() if (e.get("wikidata") or {}).get("ws_page")
+            ),
+            "with_wikisource_url": sum(
+                1 for e in entries.values() if (e.get("wikidata") or {}).get("ws_url")
+            ),
+            "wikidata_crossref_merged": wd_merged,
         },
     }
     (out / "manifest.json").write_text(
@@ -311,6 +389,11 @@ def main() -> None:
     )
     print(f"Wrote {len(entries)} work metadata entries to {out}")
     print(f"  with KR_ID: {with_kr}; multi-author works: {multi_auth}; person_id rows: {with_pid}")
+    print(
+        f"  Wikisource merged: {wd_merged}; "
+        f"with Q-id: {manifest['stats']['with_wikidata_qid']}; "
+        f"with URL: {manifest['stats']['with_wikisource_url']}"
+    )
 
 
 if __name__ == "__main__":

@@ -64,6 +64,8 @@
     "data/gaiji",
     "data/normalize",
     "data/concordance",
-    "data/metadata"
+    "data/metadata/krp_works_by_id.json",
+    "data/metadata/krp_wikidata_by_kr_id.json",
+    "data/metadata/manifest.json"
   ]
 }

@@ -46,8 +46,16 @@ Bundled sources (committed with the plugin):
 - `data/metadata/sources/dz_metadata_authors.csv` (Norbert `person_id`)
 - `data/metadata/sources/krp_dz_collation.csv` (KR_ID)
 - `data/metadata/sources/DZ_metadata_normalized.csv` (dynasty/date hints; optional but included)
+- `data/metadata/sources/dz_wikidata_qids.json` (Wikisource page + Q-ids from the 正統道藏 TOC matcher)
 
 Output: `data/metadata/dz_works_by_rel_path.json`. On import, Python attaches a DPM-style `<metadata>` block plus TEI header fields (idno, authors, creation).
+
+**Wikisource / Wikidata:** confirmed TOC matches add `ws_page`, `ws_url` (only if the page exists), and the sitelink Q-id. Unmatched works (including 續道藏) have no Q-id. Rebuild the export first:
+
+```bash
+cd ~/Python/chinese_corpus_metadata
+python scripts_wikidata/export_dz_wikidata_qids.py
+```
 
 **Authorship:** every row in `dz_metadata_authors.csv` is included per work (113 multi-author works in the corpus, up to 11 authors on 孫子批注). The build does not collapse to a lead author only.
 

@@ -1,6 +1,10 @@
 # Kanripo import plugin
 
-Self-contained hybrid plugin: Mandoku → TEI conversion, bundled gaiji tables/PNGs, parallel punctuation, and work search index. **No external `normalization_zh` checkout required.**
+Self-contained hybrid plugin: Mandoku → TEI conversion, bundled gaiji tables/PNGs, parallel punctuation, work metadata (SKQS + Daozang + Wikidata), and a KRP–Wikisource–Daozang crosswalk for one-click punctuation sources.
+
+**Runtime:** everything reads from bundled files under this package’s `data/` folder (via `LJB_PLUGIN_INSTALL_PATH`). No checkout of `chinese_corpus_metadata`, `normalization_zh`, or other sibling projects is required to import or punctuate.
+
+**Maintainers** may refresh bundled tables from upstream with `--sync-from` (see [Refreshing bundled data](#refreshing-bundled-data-maintainers-only)).
 
 ## What ships in the plugin
 
@@ -12,42 +16,52 @@ Self-contained hybrid plugin: Mandoku → TEI conversion, bundled gaiji tables/P
 | DPM + hard-replacement CSVs | `data/normalize/` |
 | Parallel punctuation | `python/kanripo_import/parallel_punct.py` |
 | Work search index | `data/krp_works.json` |
-| Work metadata (authors, dynasty, dates, vols) | `data/metadata/krp_works_by_id.json` |
-| KR ↔ DZ / Daozang concordance | `data/concordance/` (see below) |
+| Work metadata (authors, dynasty, dates, vols, Wikidata) | `data/metadata/krp_works_by_id.json` |
+| KR ↔ DZ / Daozang concordance | `data/concordance/` |
+| KRP parallel-source crosswalk (WS + Daozang buttons) | `data/concordance/krp_parallel_sources.json` |
 | Wizard UI | LJB host module (`kanripoImportUi`) |
 
-## Concordance data (Kanripo ↔ 方瞳子 Daozang)
+## Self-containment
 
-Bundled under `data/concordance/` for offline KR_ID ↔ DZID ↔ bundled Daozang filename lookup:
-
-| File | Role |
+| When | External folders? |
 | --- | --- |
-| `krp_dz_collation.csv` | Work-level KR_ID ↔ DZID (~1500 Daoist texts; from `chinese_corpus_metadata`) |
-| `kanripo_org_concordance.csv` | Kanripo.org catalogue ↔ CBETA / DZID |
-| `dz_corpus_works.csv` | DZID ↔ Fang Tongzi corpus filename |
-| `duren_jing_index.csv` | Curated Duren jing KR ↔ DZ paths (`dz_krp/index.csv`) |
-| `kanripo_daozang_map.json` | Runtime map: KR_ID → bundled Daozang `rel_path` |
-| `kanripo_daozang_overrides.csv` | Manual overrides (maintainer-edited) |
+| **Import / punctuate / search** | **No.** Python resolves paths under `data/` inside the installed plugin only (`python/kanripo_import/_paths.py`). |
+| **Rebuild metadata or concordance** | Optional. `--sync-from /path/to/chinese_corpus_metadata` copies fresh CSVs/JSON into `data/`; not needed for end users. |
+| **Daozang parallel text** | Separate **Daozang import** plugin (bundled 方瞳子 corpus). Kanripo import only stores the *path* (`rel_path`) in its crosswalk; reading text uses `daozang-import`. |
+| **Wikisource / ctext URL fetch** | Network at click time only; no local mirror required. |
 
-Refresh from upstream tables:
+Provenance fields inside some JSON files (e.g. `"source": "/home/…/matches.csv"`) record where data was built; they are **not** read at runtime.
 
-```bash
-npm run build:concordance -w @ljb/plugin-kanripo-import
-```
-
-Python API: `kanripo_import.concordance.lookup_daozang_rel_path("KR5a0087")`.
+---
 
 ## Work metadata (import entities)
 
-Bundled under `data/metadata/` for offline KR_ID lookup at import time:
+Bundled under `data/metadata/` for offline KR_ID lookup at import time.
+
+### Source tables (`data/metadata/sources/`)
 
 | File | Role |
 | --- | --- |
-| `sources/krp_works.csv` | Titles, juan file counts |
-| `sources/skqs_org_authorship.csv` | Authors, dynasty, `DATES`, `EXTENT`, SKQS source |
-| `sources/dz_metadata_works.csv` | Daozang titles, volumes (KR ↔ DZ enrichment) |
-| `sources/dz_metadata_authors.csv` | All Daozang authors with Norbert `person_id` |
-| `krp_works_by_id.json` | Built lookup (SKQS + full DZ metadata when DZID known) |
+| `krp_works.csv` | Titles, juan file counts (Kanripo catalog) |
+| `skqs_org_authorship.csv` | SKQS authors, dynasty, `DATES`, `EXTENT`, edition `SOURCE` |
+| `dz_metadata_works.csv` | Daozang titles, volumes (KR ↔ DZ enrichment) |
+| `dz_metadata_authors.csv` | All Daozang authors with Norbert `person_id` |
+| `DZ_metadata_normalized.csv` | Dynasty and date hints for Daozang works |
+| `krp_wikidata_qids.json` | SKQS ↔ Wikisource match export (Q-ids, `ws_page`, `match_tier`) |
+
+KR_ID → DZID crosswalk: bundled `data/concordance/krp_dz_collation.csv` and `kanripo_org_concordance.csv`.
+
+### Built output
+
+| File | Role |
+| --- | --- |
+| `krp_works_by_id.json` | Runtime lookup (~9k works): SKQS/DZ bibliographic metadata |
+| `krp_wikidata_by_kr_id.json` | Runtime lookup (~2.6k works): Q-ids, Wikisource URLs, pack enrichment |
+| `manifest.json` | Build stats (counts, timestamp) |
+
+Wikidata is kept in a **separate sidecar file** so the main metadata blob stays smaller and Q-id pairs are not duplicated inside every work record. At import time Python joins the two lookups by `kr_id`.
+
+Build-only inputs under `data/metadata/sources/` (including `krp_wikidata_qids.json`) are **not** bundled in the installed plugin — only the built JSON files above ship.
 
 Rebuild:
 
@@ -55,22 +69,159 @@ Rebuild:
 npm run build:metadata -w @ljb/plugin-kanripo-import
 ```
 
-On import, Python attaches a DPM-style `<metadata>` block (citation, work, authorship, date) plus TEI header fields.
+### Fields per work (`krp_works_by_id.json`)
 
-**Authorship notes:**
+**Always (from Kanripo catalog):**
 
-- Most works: author + dynasty + dates from SKQS (`skqs_org_authorship.csv`).
-- **`person_id`**: from `dz_metadata_authors.csv` when KR maps to DZID (~800+ author rows); SKQS rows also gain `person_id` when names match.
-- When SKQS has fewer authors than Daozang, **all** DZ authors are merged in.
-- `vols`: SKQS `EXTENT` (e.g. `11 卷`) when present; else DZ collation or Kanripo juan file count.
+| Field | Meaning |
+| --- | --- |
+| `kr_id` | Kanripo work id (e.g. `KR1a0030`) |
+| `title` | Work title (SKQS or Daozang overrides Kanripo when present) |
+| `juan_count` | Number of juan files in Kanripo |
+| `vols` | Extent in 卷: SKQS `EXTENT`, else Daozang vols, else juan count |
+| `source` | Edition string (SKQS `SOURCE`, or 正統道藏 for DZ-only) |
+| `cbeta_id` | CBETA id from org concordance |
+| `dzid` | Normalized Daozang id when mapped |
+| `time_dynasty` | Dynasty (SKQS → author → DZ normalized hints) |
+| `author_dates` | Life dates string when known |
+| `date_not_before`, `date_not_after` | Parsed ISO-style bounds when `DATES` is `start-end` |
+| `authorship[]` | Author rows (see below) |
+| `metadata_sources.skqs`, `.daozang` | Which catalogues contributed |
 
-Refresh SKQS sources (maintainers):
+**Per author (`authorship[]`):**
+
+| Field | Meaning |
+| --- | --- |
+| `author_index` | Order (1, 2, …) |
+| `person_name` | Author name |
+| `function` | Role (撰, 編, …) |
+| `time_dynasty` | Author dynasty |
+| `author_dates`, `date_not_before`, `date_not_after` | Life dates |
+| `person_id` | Norbert person id (from Daozang when KR ↔ DZ) |
+
+**Merge rule:** SKQS authorship wins; Daozang adds `person_id` and extra authors. Daozang fills title/vols/source only when SKQS is absent.
+
+**Wikidata block (`wikidata`, when SKQS matched to Wikisource):**
+
+| Field | Meaning |
+| --- | --- |
+| `work_qid` | Wikidata work entity (P629 parent) |
+| `edition_qid` | Wikidata edition (四庫全書本) |
+| `wikidata_work_qid` | Primary Q-id used for linking |
+| `ws_page` | Wikisource page title |
+| `ws_url` | Full Wikisource URL |
+| `match_tier` | Match confidence (e.g. `confirmed_tiyao`, `confirmed_unique_title`) |
+| `corpus_title` | Title used during matching |
+| `primary_name`, `aliases[]` | From Wikidata authority pack (**gap-fill only**, if `--wikidata-pack` used) |
+| `start_year`, `end_year`, `description` | Same (gap-fill only) |
+
+**Priority:** SKQS/Daozang catalog data always wins; Wikidata crossref adds identifiers and links; authority pack fills empty fields only.
+
+### What lands in imported TEI
+
+**`<teiHeader>` idnos:**
+
+- `Kanripo`, `CBETA`, `DZID`
+- Wikidata work URI (`<idno type="URI">`)
+- Edition URI when distinct (`subtype="edition"`)
+- Wikisource URL (`subtype="wikisource"`)
+
+**`<metadata>` block (DPM convention):**
+
+- `<citation>` attrs: kr_id, title, source, cbeta_id, dz_id, juan, Q-ids, ws_page
+- `<work>`: title, vols, `<authorship>` / `<persName>`
+- `<date>`: dynasty, notBefore/notAfter
+- `<wikidata>`: workQid, editionQid, wsPage, wsUrl, primaryName, aliases (up to 12)
+
+Per-juan fields from the Kanripo file header (juan number, source line) are unchanged.
+
+---
+
+## Parallel-source crosswalk (punctuation UI)
+
+`data/concordance/krp_parallel_sources.json` lists **Daozang-only** bundled paths (~1.5k works). **Wikisource** parallel buttons are derived at runtime from `krp_wikidata_by_kr_id.json` (~2.6k works). Python merges both in `kanripo_import.crosswalk.lookup_parallel_crosswalk()`.
+
+| Source at runtime | From |
+| --- | --- |
+| Wikisource URL + label | `krp_wikidata_by_kr_id.json` (`ws_url`, `ws_page`) |
+| Daozang `rel_path` | `krp_parallel_sources.json` |
+| Title, dz_id, cbeta_id | `krp_works_by_id.json` (joined by `kr_id`) |
+
+**UI behaviour:**
+
+- When a work (or open file’s Kanripo idno) has crosswalk entries, **one-click** Wikisource / Daozang buttons appear.
+- Manual URL, file, paste, and ctext wiki remain under **Other sources**.
+- Daozang load requires the **Daozang import** plugin enabled and corpus ready.
+
+Python API: `kanripo_import.crosswalk.lookup_parallel_crosswalk("KR1a0030")`. Bridge op `concordance_lookup` returns `parallel_crosswalk` for the desktop UI.
+
+---
+
+## Concordance data (Kanripo ↔ 方瞳子 Daozang)
+
+Bundled under `data/concordance/` for offline KR_ID ↔ DZID ↔ bundled Daozang filename lookup:
+
+| File | Role |
+| --- | --- |
+| `krp_dz_collation.csv` | Work-level KR_ID ↔ DZID (~1500 Daoist texts) |
+| `kanripo_org_concordance.csv` | Kanripo.org catalogue ↔ CBETA / DZID |
+| `dz_corpus_works.csv` | DZID ↔ Fang Tongzi corpus filename |
+| `duren_jing_index.csv` | Curated Duren jing KR ↔ DZ paths |
+| `kanripo_daozang_map.json` | Runtime map: KR_ID → bundled Daozang `rel_path` |
+| `kanripo_daozang_overrides.csv` | Manual overrides (maintainer-edited) |
+| `krp_parallel_sources.json` | KRP → bundled Daozang `rel_path` (Wikisource derived at runtime from wikidata sidecar) |
+
+Refresh concordance tables:
 
 ```bash
-python3 scripts/build-kanripo-metadata.py --sync-from ~/Python/chinese_corpus_metadata
+npm run build:concordance -w @ljb/plugin-kanripo-import
 ```
 
-## Gaiji handling
+Python API: `kanripo_import.concordance.lookup_daozang_rel_path("KR5a0087")`.
+
+---
+
+## Refreshing bundled data (maintainers only)
+
+After updating tables or SKQS–Wikisource matches in `chinese_corpus_metadata`:
+
+```bash
+# From chinese_corpus_metadata (when matches change):
+python scripts_wikidata/export_krp_wikidata_qids.py
+python scripts_wikidata/apply_skqs_resolved_matches.py --fetch-qids
+
+# Into the plugin:
+cd packages/plugin-kanripo-import
+python3 scripts/build-kanripo-metadata.py --sync-from /path/to/chinese_corpus_metadata
+npm run build:concordance   # if DZ paths changed
+```
+
+Optional Wikidata authority-pack enrichment (aliases, description, years — gap-fill only).
+When building inside the LJB monorepo, the pack is **auto-discovered** at
+`authoritypacks/packs/wikidata/work-zh-hant/works.ndjson`. Override with
+`--wikidata-pack` or `LJB_WIKIDATA_WORK_PACK`:
+
+```bash
+python3 scripts/build-kanripo-metadata.py --sync-from /path/to/chinese_corpus_metadata
+# or explicitly:
+python3 scripts/build-kanripo-metadata.py \
+  --wikidata-pack /path/to/authoritypacks/packs/wikidata/work-zh-hant/works.ndjson
+```
+
+End users who install the built plugin **never** need these steps.
+
+---
+
+## Authorship notes (summary)
+
+- Most SKQS works: author + dynasty + dates from `skqs_org_authorship.csv`.
+- **`person_id`**: from `dz_metadata_authors.csv` when KR maps to DZID (~800+ rows).
+- Multi-author Daozang works: all DZ authors merged when SKQS has fewer.
+- **`vols`**: SKQS `EXTENT` when present; else DZ vols; else Kanripo juan file count.
+
+See also `data/metadata/sources/README.md`.
+
+---
 
 - Unicode or IDS entries from [kanripo/KR-Gaiji](https://github.com/kanripo/KR-Gaiji) resolve to characters or bracket notation.
 - Image-only entries emit inline TEI:
@@ -168,3 +319,9 @@ PY
 1. `npm run build:kanripo-import` in `plugins`
 2. `npm run dev:desktop` in `leaf-writer`
 3. Tools → Plugins → install `packages/plugin-kanripo-import`, enable per project
+
+### Single-juan import (Kanripo API)
+
+The import dialog can fetch **one 卷** via the [kanripo](https://pypi.org/project/kanripo/) API client (`pip` name: `kanripo`, import: `import kanripo`) instead of cloning the whole GitHub repo. It is bundled in the desktop Python runtime alongside sanmiao (`npm run python:download` in `apps/desktop`).
+
+Enter juan as `001` or full loc `KR1a0030_001`. Bridge op: `fetch_juan` with `kr_id`, `juan`, `cache_root`.

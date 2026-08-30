@@ -22,17 +22,40 @@ def cli_main() -> None:
 
     op = payload.get("op") or "convert"
 
+    if op == "fetch_juan":
+        from kanripo_import.kanripo_fetch import fetch_juan_to_cache, resolve_juan_loc
+
+        kr_id = str(payload.get("kr_id") or "").strip()
+        juan = str(payload.get("juan") or "").strip()
+        cache_root = str(payload.get("cache_root") or "").strip()
+        if not cache_root:
+            raise SystemExit("fetch_juan requires cache_root")
+        path = fetch_juan_to_cache(kr_id=kr_id, juan=juan, cache_root=cache_root)
+        loc = resolve_juan_loc(kr_id, juan)
+        result = {
+            "kr_id": kr_id,
+            "loc": loc,
+            "path": str(path),
+            "files": [str(path)],
+        }
+        json.dump(result, sys.stdout, ensure_ascii=False)
+        sys.stdout.write("\n")
+        return
+
     if op == "concordance_lookup":
         from dataclasses import asdict
 
         from kanripo_import.concordance import lookup_daozang_rel_path, lookup_dz_id
+        from kanripo_import.crosswalk import lookup_parallel_crosswalk
 
         kr_id = str(payload.get("kr_id") or "").strip()
         entry = lookup_daozang_rel_path(kr_id)
+        crosswalk = lookup_parallel_crosswalk(kr_id)
         result = {
             "kr_id": kr_id,
             "dz_id": lookup_dz_id(kr_id),
             "daozang": asdict(entry) if entry else None,
+            "parallel_crosswalk": asdict(crosswalk) if crosswalk else None,
         }
         json.dump(result, sys.stdout, ensure_ascii=False)
         sys.stdout.write("\n")

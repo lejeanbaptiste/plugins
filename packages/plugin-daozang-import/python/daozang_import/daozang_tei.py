@@ -267,6 +267,17 @@ def convert_daozang_txt(path: Path, *, rel_path: str = "") -> dict[str, object]:
                 "author_dates": work.author_dates,
             }
         )
+        if work.wikidata:
+            wd = work.wikidata
+            meta.update(
+                {
+                    "work_qid": wd.work_qid,
+                    "edition_qid": wd.edition_qid,
+                    "ws_page": wd.ws_page,
+                    "ws_url": wd.ws_url,
+                    "match_tier": wd.match_tier,
+                }
+            )
         entities = work_metadata_to_dict(work)
         metadata_xml = build_metadata_xml(work)
         meta["authorship"] = entities.get("authorship", [])
